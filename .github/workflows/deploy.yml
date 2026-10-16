@@ -1,0 +1,100 @@
+# Push lên main (đổi account / web / deploy) -> kiểm tra Go -> build image account -> Docker Hub -> VPS (docker stack deploy).
+# Cài đặt 1 lần: xem deploy/README.md mục "GitHub Actions" (Variables + Secrets + environment production).
+name: Account server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "account/**"
+      - "admin-web/**"
+      - "portal-web/**"
+      - "deploy/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 2 lần push liên tiếp: chạy lần lượt, không chồng nhau. (Workflow game server ở repo game chỉ đổi image game —
+# swarm_up.sh giữ nguyên tag của image còn lại.)
+concurrency:
+  group: deploy-account
+  cancel-in-progress: false
+
+env:
+  IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/kiemhiep-account
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: account
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: account/go.mod
+          cache-dependency-path: account/go.sum
+      - run: go vet ./...
+      - run: go test ./...
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: tag
+        run: echo "tag=$(date -u +%Y%m%d-%H%M)-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+        if: ${{ vars.VPS_PLATFORM == 'linux/arm64' }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: account/Dockerfile
+          platforms: ${{ vars.VPS_PLATFORM || 'linux/amd64' }}
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.tag.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # Bật "Required reviewers" cho environment này trên GitHub nếu muốn duyệt tay trước khi lên máy thật.
+    environment: production
+    env:
+      HUB: ${{ vars.DOCKERHUB_USERNAME }}
+      TAG: ${{ needs.build.outputs.tag }}
+      VPS: ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}
+      PORT: ${{ vars.VPS_PORT || '22' }}
+      DIR: ${{ vars.REMOTE_DIR || '/opt/kiemhiep' }}
+      DOMAIN: ${{ vars.DOMAIN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Khóa SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$SSH_KEY" ] || [ -z "$KNOWN_HOSTS" ]; then echo "Thiếu secret VPS_SSH_KEY / VPS_KNOWN_HOSTS"; exit 1; fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Đẩy deploy/ + docker stack deploy
+        run: |
+          tar -czf - --exclude=./deploy/deploy.env ./deploy | ssh -p "$PORT" "$VPS" "mkdir -p '$DIR' && tar -xzf - -C '$DIR'"
+          ssh -p "$PORT" "$VPS" "cd '$DIR' && bash deploy/swarm_up.sh '$HUB' 'account=$TAG'"
+      - name: Kiểm tra https://DOMAIN/healthz
+        run: curl -fsS --retry 10 --retry-delay 6 --retry-all-errors "https://$DOMAIN/healthz"

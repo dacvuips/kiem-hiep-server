@@ -1,0 +1,168 @@
+# DOCKER SWARM STACK "kiemhiep" — image lấy từ Docker Hub, khóa bí mật là Docker secrets (gắn file /run/secrets/*).
+# Không chạy tay: deploy/swarm_up.sh (deploy.sh tự gọi) xuất các biến ${...} bên dưới rồi chạy docker stack deploy.
+#   KH_DIR            thư mục trên VPS (/opt/kiemhiep): stack.env, secrets/, client/
+#   HUB               tài khoản Docker Hub
+#   ACCOUNT_TAG       image <HUB>/kiemhiep-account:<ACCOUNT_TAG>  (repo kiem-hiep-server build)
+#   GAME_TAG          image <HUB>/kiemhiep-game:<GAME_TAG>        (repo game kiem-hiep build)
+#   H_<TÊN>           mã băm nội dung từng file secret/config: secret không sửa được tại chỗ trên Swarm, nên đổi nội dung = tên mới
+#
+# Mọi service đặt trên node có nhãn kiemhiep.main=true (swarm_up.sh tự gắn cho manager nếu chưa node nào có):
+# Postgres giữ dữ liệu ở volume cục bộ, account đọc gói game ở ${KH_DIR}/client, cổng mở kiểu "host" ở node đó.
+# Cổng mode: host (không qua routing mesh) để server thấy IP thật của người chơi (giới hạn yêu cầu theo IP)
+# và người chơi kết nối đúng node có game server (GAME_PUBLIC_HOST).
+version: "3.8"
+
+x-main-node: &main-node
+  constraints: [node.labels.kiemhiep.main == true]
+
+x-game: &game
+  image: ${HUB}/kiemhiep-game:${GAME_TAG}
+  networks: [kiemhiep]
+  secrets: [game_service_key]
+  stop_grace_period: 30s
+  deploy:
+    replicas: 1
+    placement: *main-node
+    restart_policy: { condition: any, delay: 3s }   # web Admin "khởi động lại" = tiến trình thoát, Swarm bật lại
+    update_config: { order: stop-first, failure_action: rollback }
+
+x-game-env: &game-env
+  GAME_SERVICE_KEY_FILE: /run/secrets/game_service_key
+  GAME_ACCOUNT_URL: http://account:8080
+  GAME_SERVER_ID: "1"
+  GAME_PUBLIC_HOST: ${GAME_PUBLIC_HOST}
+  GAME_DEV_TRUST_CLIENT: "0"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kiemhiep
+      POSTGRES_DB: kiemhiep
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    networks: [kiemhiep]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kiemhiep"]
+      interval: 5s
+      retries: 30
+    stop_grace_period: 60s
+    deploy:
+      replicas: 1
+      placement: *main-node
+      restart_policy: { condition: any, delay: 5s }
+
+  account:
+    image: ${HUB}/kiemhiep-account:${ACCOUNT_TAG}
+    env_file: [ "${KH_DIR}/stack.env" ]
+    environment:
+      DATABASE_URL_FILE: /run/secrets/database_url
+      JWT_PRIVATE_KEY_FILE: /run/secrets/jwt_private_key
+      PASSWORD_PEPPER_FILE: /run/secrets/password_pepper
+      TOKEN_HMAC_KEY_FILE: /run/secrets/token_hmac_key
+      GAME_SERVICE_KEY_FILE: /run/secrets/game_service_key
+      BOOTSTRAP_ADMIN_PASS_FILE: /run/secrets/bootstrap_admin_pass
+      SMTP_PASS_FILE: /run/secrets/smtp_pass
+      GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_client_secret
+      CLIENT_DIR: /client
+    secrets: [database_url, jwt_private_key, password_pepper, token_hmac_key, game_service_key,
+              bootstrap_admin_pass, smtp_pass, google_client_secret]
+    volumes:
+      - { type: bind, source: "${KH_DIR}/client", target: /client, read_only: true }
+    networks: [kiemhiep]
+    deploy:
+      replicas: 1   # migrate database lúc khởi động — giữ 1 bản để không chạy migrate song song
+      placement: *main-node
+      restart_policy: { condition: any, delay: 3s }
+      update_config: { order: stop-first, failure_action: rollback }
+
+  caddy:
+    image: caddy:2.8-alpine
+    environment:
+      DOMAIN: ${DOMAIN}
+    configs:
+      - { source: caddyfile, target: /etc/caddy/Caddyfile }
+    volumes: [caddy_data:/data, caddy_config:/config]
+    ports:
+      - { target: 80, published: 80, protocol: tcp, mode: host }
+      - { target: 443, published: 443, protocol: tcp, mode: host }
+      - { target: 443, published: 443, protocol: udp, mode: host }
+    networks: [kiemhiep]
+    deploy:
+      replicas: 1
+      placement: *main-node
+      restart_policy: { condition: any, delay: 3s }
+
+  # Thế giới (map chính).
+  game:
+    <<: *game
+    environment:
+      <<: *game-env
+    ports:
+      - { target: 7777, published: 7777, protocol: udp, mode: host }
+      - { target: 7778, published: 7778, protocol: tcp, mode: host }
+
+  # Chiến trường Tống Kim.
+  battle:
+    <<: *game
+    environment:
+      <<: *game-env
+      GAME_BATTLE: "1"
+      GAME_MAP_DIR: res://world/maps/map_378
+      GAME_ENET_PORT: "7787"
+      GAME_WS_PORT: "7788"
+      GAME_BATTLE_SIGNUP: "600"
+      GAME_BATTLE_FIGHT: "3600"
+    ports:
+      - { target: 7787, published: 7787, protocol: udp, mode: host }
+      - { target: 7788, published: 7788, protocol: tcp, mode: host }
+
+  # Đấu trường PK.
+  arena:
+    <<: *game
+    environment:
+      <<: *game-env
+      GAME_ARENA: "1"
+      GAME_MAP_DIR: res://world/maps/map_397
+      GAME_ENET_PORT: "7797"
+      GAME_WS_PORT: "7798"
+    ports:
+      - { target: 7797, published: 7797, protocol: udp, mode: host }
+      - { target: 7798, published: 7798, protocol: tcp, mode: host }
+
+  # Phòng train chung Vượt Ải.
+  field:
+    <<: *game
+    environment:
+      <<: *game-env
+      GAME_FIELD: "1"
+      GAME_FIELD_INDEX: "0"
+      GAME_ENET_PORT: "7807"
+      GAME_WS_PORT: "7808"
+    ports:
+      - { target: 7807, published: 7807, protocol: udp, mode: host }
+      - { target: 7808, published: 7808, protocol: tcp, mode: host }
+
+networks:
+  kiemhiep:
+    driver: overlay
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+
+configs:
+  caddyfile: { file: "${KH_DIR}/deploy/Caddyfile", name: "kh_caddyfile_${H_CADDYFILE}" }
+
+secrets:
+  db_password: { file: "${KH_DIR}/secrets/db_password", name: "kh_db_password_${H_DB_PASSWORD}" }
+  database_url: { file: "${KH_DIR}/secrets/database_url", name: "kh_database_url_${H_DATABASE_URL}" }
+  jwt_private_key: { file: "${KH_DIR}/secrets/jwt_private_key", name: "kh_jwt_private_key_${H_JWT_PRIVATE_KEY}" }
+  password_pepper: { file: "${KH_DIR}/secrets/password_pepper", name: "kh_password_pepper_${H_PASSWORD_PEPPER}" }
+  token_hmac_key: { file: "${KH_DIR}/secrets/token_hmac_key", name: "kh_token_hmac_key_${H_TOKEN_HMAC_KEY}" }
+  game_service_key: { file: "${KH_DIR}/secrets/game_service_key", name: "kh_game_service_key_${H_GAME_SERVICE_KEY}" }
+  bootstrap_admin_pass: { file: "${KH_DIR}/secrets/bootstrap_admin_pass", name: "kh_bootstrap_admin_pass_${H_BOOTSTRAP_ADMIN_PASS}" }
+  smtp_pass: { file: "${KH_DIR}/secrets/smtp_pass", name: "kh_smtp_pass_${H_SMTP_PASS}" }
+  google_client_secret: { file: "${KH_DIR}/secrets/google_client_secret", name: "kh_google_client_secret_${H_GOOGLE_CLIENT_SECRET}" }

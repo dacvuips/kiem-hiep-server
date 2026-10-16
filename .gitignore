@@ -1,0 +1,8 @@
+# Khóa máy dev — KHÔNG commit
+.env
+deploy/deploy.env
+
+node_modules/
+dist/
+*.tsbuildinfo
+admin-web/e2e/shots/

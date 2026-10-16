@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "Kiểm tra web Admin bằng trình duyệt thật (Chrome headless). Cài: npm i trong thư mục này. Chạy: xem README server.",
+  "dependencies": { "puppeteer-core": "23.5.0" }
+}

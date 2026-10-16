@@ -1,0 +1,224 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+body {
+  @apply bg-ink-950 font-sans text-parch-100 antialiased;
+  /* Nền: vân giấy cũ mờ + quầng sáng vàng đồng, toàn bộ là CSS. */
+  background-image:
+    radial-gradient(ellipse at 50% -10%, rgba(193, 148, 67, 0.12), transparent 60%),
+    radial-gradient(ellipse at 100% 100%, rgba(161, 35, 32, 0.08), transparent 50%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.012) 0 2px, transparent 2px 6px),
+    linear-gradient(#15100c, #0d0907);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  /* Tiêu đề chữ vàng nhũ */
+  .title-gold {
+    @apply font-serif font-bold tracking-wide;
+    background: linear-gradient(180deg, #fff3cf 0%, #ecd08a 40%, #c19443 70%, #8a6326 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: none;
+    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.7));
+  }
+
+  /* Tiêu đề phần có hoa văn hai bên */
+  .section-title {
+    @apply flex items-center justify-center gap-4 text-center;
+  }
+  .section-title::before,
+  .section-title::after {
+    content: '';
+    @apply h-px max-w-[160px] flex-1;
+    background: linear-gradient(90deg, transparent, #c19443);
+  }
+  .section-title::after {
+    background: linear-gradient(270deg, transparent, #c19443);
+  }
+
+  /* Khung trang trí: viền vàng đồng 2 lớp + góc chạm */
+  .frame {
+    @apply relative rounded-sm border border-gold-600/70 bg-ink-900/90 shadow-frame;
+    background-image:
+      linear-gradient(180deg, rgba(193, 148, 67, 0.06), transparent 30%),
+      repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.015) 0 1px, transparent 1px 5px);
+  }
+  .frame::before,
+  .frame::after {
+    content: '';
+    @apply pointer-events-none absolute h-4 w-4 border-gold-400;
+  }
+  .frame::before {
+    @apply -left-px -top-px border-l-2 border-t-2;
+  }
+  .frame::after {
+    @apply -bottom-px -right-px border-b-2 border-r-2;
+  }
+
+  /* Tấm giấy da */
+  .parchment {
+    @apply relative rounded-sm text-parch-900;
+    background:
+      radial-gradient(ellipse at center, rgba(255, 250, 235, 0.9), rgba(230, 212, 168, 0.95) 70%, rgba(190, 160, 110, 1) 100%),
+      #e6d4a8;
+    box-shadow:
+      inset 0 0 40px rgba(110, 80, 34, 0.45),
+      0 0 0 1px #9a7231,
+      0 0 0 4px #241a13,
+      0 0 0 5px #c19443,
+      0 20px 40px -14px rgba(0, 0, 0, 0.8);
+  }
+
+  /* Nút */
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-sm px-5 py-2.5 text-sm font-semibold
+      transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-300 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-gold {
+    @apply btn border border-gold-300/80 text-ink-950;
+    background: linear-gradient(180deg, #f6e3b0 0%, #d9b264 45%, #a8792f 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 14px -4px rgba(217, 178, 100, 0.55);
+  }
+  .btn-gold:not(:disabled):hover {
+    filter: brightness(1.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 6px 20px -4px rgba(217, 178, 100, 0.75);
+  }
+  .btn-seal {
+    @apply btn border border-seal-400/70 text-parch-50;
+    background: linear-gradient(180deg, #d9443d 0%, #a12320 55%, #7c1916 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 4px 14px -4px rgba(195, 48, 43, 0.6);
+  }
+  .btn-seal:not(:disabled):hover {
+    filter: brightness(1.1);
+  }
+  .btn-ghost {
+    @apply btn border border-gold-600/60 bg-ink-900/60 text-gold-200 hover:border-gold-400 hover:bg-ink-800 hover:text-gold-100;
+  }
+  .btn-lg {
+    @apply px-7 py-3.5 text-base;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  /* Ô nhập liệu */
+  .input {
+    @apply h-11 w-full rounded-sm border border-gold-700/70 bg-ink-950/80 px-3 text-sm text-parch-50 placeholder:text-parch-300/40
+      outline-none transition focus:border-gold-400 focus:ring-2 focus:ring-gold-400/20 disabled:opacity-60;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-gold-200;
+  }
+  .hint {
+    @apply mt-1 text-xs text-parch-300/60;
+  }
+
+  /* Bảng */
+  .table-wrap {
+    @apply overflow-x-auto rounded-sm border border-gold-700/50;
+  }
+  .table-wrap table {
+    @apply w-full min-w-[560px] border-collapse text-sm;
+  }
+  .table-wrap th {
+    @apply whitespace-nowrap border-b border-gold-700/60 bg-ink-800/80 px-4 py-2.5 text-left font-serif text-xs font-semibold uppercase tracking-wider text-gold-300;
+  }
+  .table-wrap td {
+    @apply border-b border-gold-700/20 px-4 py-3 text-parch-100/90;
+  }
+  .table-wrap tr:last-child td {
+    @apply border-b-0;
+  }
+  .table-wrap tbody tr:hover td {
+    @apply bg-gold-500/5;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-xs font-medium;
+  }
+
+  /* Dấu triện đỏ */
+  .seal-stamp {
+    @apply inline-flex items-center justify-center rounded-sm border-2 border-seal-500 font-serif font-bold text-seal-500;
+    transform: rotate(-6deg);
+    box-shadow: inset 0 0 0 2px rgba(195, 48, 43, 0.25);
+  }
+
+  .divider-gold {
+    @apply h-px w-full;
+    background: linear-gradient(90deg, transparent, rgba(193, 148, 67, 0.7), transparent);
+  }
+}
+
+/* Banner đầu trang */
+.hero-bg {
+  background-image:
+    linear-gradient(180deg, rgba(13, 9, 7, 0.35) 0%, rgba(13, 9, 7, 0.15) 40%, rgba(13, 9, 7, 0.85) 85%, #0d0907 100%),
+    radial-gradient(ellipse at center, transparent 40%, rgba(13, 9, 7, 0.7) 100%),
+    url('/img/hero.jpg');
+  background-size: cover;
+  background-position: center 30%;
+}
+.page-banner {
+  background-image:
+    linear-gradient(180deg, rgba(13, 9, 7, 0.55), rgba(13, 9, 7, 0.95)),
+    url('/img/bg-valley.jpg');
+  background-size: cover;
+  background-position: center 40%;
+}
+.download-bg {
+  background-image:
+    linear-gradient(180deg, #0d0907 0%, rgba(13, 9, 7, 0.8) 25%, rgba(13, 9, 7, 0.8) 75%, #0d0907 100%),
+    url('/img/bg-battle.jpg');
+  background-size: cover;
+  background-position: center;
+}
+.auth-bg {
+  background-image:
+    radial-gradient(ellipse at center, rgba(13, 9, 7, 0.55), rgba(13, 9, 7, 0.95) 75%),
+    url('/img/bg-valley.jpg');
+  background-size: cover;
+  background-position: center;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-rise {
+  animation: rise 0.6s ease-out both;
+}
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise {
+    animation: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}

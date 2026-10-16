@@ -1,0 +1,108 @@
+# Môi trường chạy trên MÁY DEV (repo kiem-hiep-server):  docker compose up -d --build
+#   API tài khoản : http://localhost:8080
+#   Web Admin     : http://localhost:8080/admin/
+#   Game server   : bash server/dev.sh up  (chạy trong REPO GAME kiem-hiep — build image kiemhiep-game:local rồi bật ở đây)
+#                   thế giới 7777/7778, Tống Kim 7787/7788, Đấu trường 7797/7798, Train chung 7807/7808
+#   Hộp thư giả   : http://localhost:8025  (xem mã OTP quên mật khẩu)
+#   PostgreSQL    : 127.0.0.1:5432  (user/db kiemhiep, mật khẩu = DB_PASSWORD trong .env)
+# Mọi khóa/mật khẩu nằm trong .env (xem .env.example), không có trong file này.
+# Máy chủ thật dùng Docker Swarm: deploy/stack.yml (xem deploy/README.md).
+
+# Giữ tên project "server" (tên thư mục cũ trong repo game) -> dùng lại volume PostgreSQL dev đang có.
+name: server
+
+x-game: &game
+  image: ${GAME_IMAGE:-kiemhiep-game:local}   # repo game build: bash server/dev.sh build
+  restart: unless-stopped        # tự bật lại khi tiến trình thoát (khởi động lại êm từ web Admin), trừ khi tắt bằng dev.sh down
+  depends_on: [account]
+  profiles: [game]
+x-game-env: &game-env
+  GAME_SERVICE_KEY: ${GAME_SERVICE_KEY:?thiếu GAME_SERVICE_KEY trong .env}
+  GAME_ACCOUNT_URL: http://account:8080
+  GAME_SERVER_ID: "1"
+  GAME_PUBLIC_HOST: ${GAME_PUBLIC_HOST:-127.0.0.1}   # địa chỉ người chơi kết nối tới (báo qua /v1/battle, /v1/arena, /v1/field)
+  GAME_DEV_TRUST_CLIENT: ${GAME_DEV_TRUST_CLIENT:-0}   # 1 = CHỈ máy dev (xem .env.example)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kiemhiep
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?thiếu DB_PASSWORD trong .env}
+      POSTGRES_DB: kiemhiep
+    ports: ["127.0.0.1:5432:5432"]   # chỉ mở cho máy này, không mở ra mạng
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kiemhiep"]
+      interval: 2s
+      retries: 30
+
+  mailpit:
+    image: axllent/mailpit:v1.20
+    ports: ["127.0.0.1:8025:8025"]
+
+  account:
+    build:
+      context: .
+      dockerfile: account/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://kiemhiep:${DB_PASSWORD}@postgres:5432/kiemhiep?sslmode=disable
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      CLIENT_DIR: /client          # bản cài game cho APK launcher (repo game: python tools/build_client_update.py)
+    volumes: ["${CLIENT_DIR_HOST:-../kiem-hiep/server/client}:/client:ro"]
+    # Mặc định chỉ máy này gọi được (API + web Admin). Thử từ điện thoại / máy khác trong LAN: ACCOUNT_BIND=0.0.0.0 trong .env.
+    # Máy chủ thật: giữ 127.0.0.1 và đặt reverse proxy HTTPS (Caddy / Nginx) phía trước.
+    ports: ["${ACCOUNT_BIND:-127.0.0.1}:8080:8080"]
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      mailpit: { condition: service_started }
+
+  # GAME SERVER (Godot headless) — 4 tiến trình cùng 1 gói server/game/game_server.pck, khác nhau ở biến môi trường (khối chung x-game).
+  # Build + bật: bash server/dev.sh up   (tự build lại gói khi code đổi). Thêm 1 field server: chép khối "field", đổi tên,
+  # GAME_FIELD_INDEX (1..8) và 2 cổng.
+  game:
+    <<: *game
+    environment:
+      <<: *game-env
+    ports: ["7777:7777/udp", "7778:7778"]
+
+  # Chiến trường Tống Kim: map chiến trường ở cổng riêng (BattleServer).
+  battle:
+    <<: *game
+    environment:
+      <<: *game-env
+      GAME_BATTLE: "1"
+      GAME_MAP_DIR: res://world/maps/map_378
+      GAME_ENET_PORT: "7787"
+      GAME_WS_PORT: "7788"
+      GAME_BATTLE_SIGNUP: ${GAME_BATTLE_SIGNUP:-600}     # giây báo danh (gốc 10 phút)
+      GAME_BATTLE_FIGHT: ${GAME_BATTLE_FIGHT:-3600}      # giây khai chiến (gốc 60 phút)
+    ports: ["7787:7787/udp", "7788:7788"]
+
+  # Đấu trường PK (popup PK: Đại hội võ lâm / Võ lâm Liên đấu).
+  arena:
+    <<: *game
+    environment:
+      <<: *game-env
+      GAME_ARENA: "1"
+      GAME_MAP_DIR: res://world/maps/map_397
+      GAME_ENET_PORT: "7797"
+      GAME_WS_PORT: "7798"
+    ports: ["7797:7797/udp", "7798:7798"]
+
+  # Phòng train chung Vượt Ải (map luyện công / Địa Ngục): 1 tiến trình nhiều phòng, vào bằng ID (FieldServer).
+  field:
+    <<: *game
+    environment:
+      <<: *game-env
+      GAME_FIELD: "1"
+      GAME_FIELD_INDEX: "0"         # chữ số đầu ID phòng = index + 1 (không trùng giữa các field server)
+      GAME_ENET_PORT: "7807"
+      GAME_WS_PORT: "7808"
+    ports: ["7807:7807/udp", "7808:7808"]
+
+volumes:
+  pgdata:

@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Bảng màu: nền trung tính, điểm nhấn đỏ son + vàng kim theo game. Giá trị là "r g b". */
+:root {
+  --bg: 246 245 243;
+  --surface: 255 255 255;
+  --subtle: 241 239 236;
+  --line: 228 225 220;
+  --fg: 28 25 23;
+  --muted: 113 106 99;
+  --accent: 180 35 42;
+  --accent-fg: 255 255 255;
+  --gold: 176 125 38;
+  --ok: 22 135 76;
+  --warn: 196 120 10;
+  --danger: 200 40 40;
+  --info: 37 99 205;
+  color-scheme: light;
+}
+.dark {
+  --bg: 17 16 15;
+  --surface: 26 24 23;
+  --subtle: 34 32 30;
+  --line: 48 45 42;
+  --fg: 238 235 230;
+  --muted: 160 152 143;
+  --accent: 222 70 74;
+  --accent-fg: 255 255 255;
+  --gold: 222 176 92;
+  --ok: 64 190 120;
+  --warn: 236 170 60;
+  --danger: 240 90 90;
+  --info: 110 160 250;
+  color-scheme: dark;
+}
+
+html, body, #root { height: 100%; }
+body { @apply bg-bg text-fg font-sans antialiased; }
+.tabular { font-variant-numeric: tabular-nums; }
+
+@layer components {
+  .card { @apply bg-surface border border-line rounded-xl shadow-card; }
+  .input {
+    @apply h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm text-fg placeholder:text-muted/70
+      outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60;
+  }
+  .label { @apply mb-1.5 block text-sm font-medium text-fg; }
+  .th { @apply px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted whitespace-nowrap; }
+  .td { @apply px-4 py-3 text-sm; }
+  /* Ô số hẹp: bỏ mũi tên tăng/giảm để không che số. */
+  .no-spin { -moz-appearance: textfield; }
+  .no-spin::-webkit-outer-spin-button, .no-spin::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+}

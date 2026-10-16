@@ -1,0 +1,7 @@
+# HTTPS cho server tài khoản (API, web Admin, trang người chơi, gói game cho launcher). Caddy tự lấy chứng chỉ Let's Encrypt.
+{$DOMAIN} {
+	# Gói .pck đã nén sẵn + cần tải tiếp (Range) -> không nén lại.
+	@compress not path /client/files/*
+	encode @compress zstd gzip
+	reverse_proxy account:8080
+}

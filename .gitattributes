@@ -1,0 +1,6 @@
+# Mọi file văn bản dùng LF (script chạy trên VPS Linux; máy dev Windows bật core.autocrlf)
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
