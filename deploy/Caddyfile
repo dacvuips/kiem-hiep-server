@@ -1,7 +1,14 @@
 # CỔNG VÀO DUY NHẤT (80/443): API, web Admin, trang người chơi, gói game cho launcher VÀ cả 4 game server qua WebSocket (wss://).
 # Caddy tự lấy chứng chỉ Let's Encrypt. Game server không mở cổng nào ra ngoài — chỉ Caddy nói chuyện với chúng trong mạng Swarm.
 # Thêm 1 field server: thêm 1 dòng handle /ws/field/<index> (index = GAME_FIELD_INDEX) tương ứng trong stack.yml.
-{$DOMAIN} {
+# SITE_ADDR: tên miền (chế độ public, tự có HTTPS) hoặc :80 (chế độ proxy — Nginx Proxy Manager/Traefik... đứng trước lo TLS).
+{
+	servers {
+		# Proxy phía trước nằm trong mạng riêng: tin X-Forwarded-For để account thấy IP thật của người chơi.
+		trusted_proxies static private_ranges
+	}
+}
+{$SITE_ADDR} {
 	handle /ws/world {
 		reverse_proxy game:7778
 	}

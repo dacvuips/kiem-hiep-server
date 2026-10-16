@@ -80,14 +80,11 @@ services:
   caddy:
     image: caddy:2.8-alpine
     environment:
-      DOMAIN: ${DOMAIN}
+      SITE_ADDR: ${SITE_ADDR}   # public: <DOMAIN> (Caddy lấy chứng chỉ) | proxy: :80 (HTTP nội bộ, proxy có sẵn lo TLS)
     configs:
       - { source: caddyfile, target: /etc/caddy/Caddyfile }
     volumes: [caddy_data:/data, caddy_config:/config]
-    ports:
-      - { target: 80, published: 80, protocol: tcp, mode: host }
-      - { target: 443, published: 443, protocol: tcp, mode: host }
-      - { target: 443, published: 443, protocol: udp, mode: host }
+    # Cổng 80/443 do deploy/stack.public.yml thêm vào (chế độ public). Chế độ proxy: không mở cổng nào.
     networks: [kiemhiep]
     deploy:
       replicas: 1
@@ -139,6 +136,7 @@ services:
 networks:
   kiemhiep:
     driver: overlay
+    attachable: true   # chế độ proxy: service proxy có sẵn (VD Nginx Proxy Manager) nối vào mạng này để tới caddy:80
 
 volumes:
   pgdata:

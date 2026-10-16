@@ -1,0 +1,10 @@
+# Chế độ "public": Caddy là cổng vào duy nhất, mở 80/443 (mode host để account thấy IP thật của người chơi).
+# swarm_up.sh ghép file này sau stack.yml khi cổng 80/443 còn trống. Cổng bị chiếm -> chế độ "proxy" (không dùng file này).
+version: "3.8"
+
+services:
+  caddy:
+    ports:
+      - { target: 80, published: 80, protocol: tcp, mode: host }
+      - { target: 443, published: 443, protocol: tcp, mode: host }
+      - { target: 443, published: 443, protocol: udp, mode: host }

@@ -44,15 +44,28 @@ if [ -z "$(docker node ls -q --filter node.label=kiemhiep.main=true)" ]; then
 fi
 mkdir -p client/files
 
-# Cổng 80/443 do service khác (Traefik, nginx...) chiếm thì Caddy của stack không bật được — dừng sớm, báo rõ.
-for port in 80 443; do
-	other="$(docker service ls --format '{{.Name}} {{.Ports}}' | grep -E "(:|\*:)$port->" | grep -v "^${STACK}_caddy " || true)"
-	if [ -n "$other" ] || { ss -ltnH "sport = :$port" 2>/dev/null | grep -q . && ! docker service ps "${STACK}_caddy" >/dev/null 2>&1; }; then
-		echo "Cổng $port đang được dùng: ${other:-tiến trình ngoài Swarm (ss -ltnp)}" >&2
-		echo "Đã có reverse proxy sẵn: bỏ service caddy trong deploy/stack.yml và trỏ proxy đó tới service account:8080 (mạng ${STACK}_kiemhiep)." >&2
-		exit 1
-	fi
-done
+# Chế độ cổng vào: public = Caddy mở 80/443 và tự lấy chứng chỉ; proxy = đã có reverse proxy (Nginx Proxy Manager, Traefik...)
+# giữ 80/443, Caddy chỉ chia đường trong mạng Swarm (caddy:80) và proxy đó lo TLS. Ép tay: EDGE=public|proxy trong stack.env.
+EDGE="$(grep -E '^EDGE=' stack.env | cut -d= -f2- || true)"
+if [ -z "$EDGE" ]; then
+	busy=0
+	for port in 80 443; do
+		other="$(docker service ls --format '{{.Name}} {{.Ports}}' | grep -E "(:|\*:)$port->" | grep -v "^${STACK}_caddy " || true)"
+		if [ -n "$other" ] || { ss -ltnH "sport = :$port" 2>/dev/null | grep -q . && ! docker service ps "${STACK}_caddy" >/dev/null 2>&1; }; then
+			busy=1
+		fi
+	done
+	EDGE=public
+	[ "$busy" = 1 ] && EDGE=proxy
+fi
+case "$EDGE" in public|proxy) ;; *) echo "EDGE không hợp lệ: $EDGE (public | proxy)" >&2; exit 1 ;; esac
+stack_files=(-c deploy/stack.yml)
+if [ "$EDGE" = public ]; then
+	stack_files+=(-c deploy/stack.public.yml); export SITE_ADDR="$(grep -E '^DOMAIN=' stack.env | cut -d= -f2-)"
+else
+	export SITE_ADDR=":80"
+fi
+echo "== Cổng vào: $EDGE"
 
 h() { sha256sum "$1" | cut -c1-12; }
 export KH_DIR="$dir" HUB ACCOUNT_TAG GAME_TAG
@@ -67,7 +80,7 @@ done
 echo "== docker stack deploy $STACK (account:$ACCOUNT_TAG, game:$GAME_TAG)"
 wait_flag=()
 docker stack deploy --help 2>/dev/null | grep -q -- '--detach' && wait_flag=(--detach=false)   # Docker 26+: chờ service chạy xong
-docker stack deploy -c deploy/stack.yml --with-registry-auth --prune "${wait_flag[@]}" "$STACK"
+docker stack deploy "${stack_files[@]}" --with-registry-auth --prune "${wait_flag[@]}" "$STACK"
 
 # Secret/config cũ (nội dung đã đổi -> tên cũ) không service nào dùng nữa: xoá. Cái đang dùng thì Docker từ chối xoá.
 for s in $(docker secret ls --format '{{.Name}}' | grep '^kh_' || true); do docker secret rm "$s" >/dev/null 2>&1 || true; done
