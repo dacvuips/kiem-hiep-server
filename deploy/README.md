@@ -35,13 +35,13 @@ Settings -> Secrets and variables -> Actions:
 
 | Loại | Tên | Giá trị |
 |---|---|---|
-| Variable | `DOCKERHUB_USERNAME` | tài khoản Docker Hub |
+| Secret | `DOCKER_HUB_USERNAME` | tài khoản Docker Hub (để ở Variable cùng tên cũng được — log dễ đọc hơn) |
+| Secret | `DOCKER_HUB_PASSWORD` | **Access Token** Docker Hub (Account settings -> Personal access tokens, Read & Write) — đừng dùng mật khẩu đăng nhập |
 | Variable | `VPS_HOST` | IP / tên miền VPS manager |
 | Variable | `VPS_USER` | user SSH (VD `root` hoặc `deploy` có quyền docker) |
 | Variable | `VPS_PORT` | cổng SSH (bỏ trống = 22) |
 | Variable | `DOMAIN` | `api.<tên miền>` (chỉ repo server — kiểm tra /healthz) |
 | Variable | `VPS_PLATFORM` | bỏ trống = `linux/amd64`; VPS chip ARM: `linux/arm64` |
-| Secret | `DOCKERHUB_TOKEN` | Access Token Docker Hub |
 | Secret | `VPS_SSH_KEY` | khóa SSH **riêng cho Actions** (`ssh-keygen -t ed25519 -f gh_deploy -N ""`, chép `gh_deploy.pub` vào `~/.ssh/authorized_keys` trên VPS, dán nội dung `gh_deploy`) |
 | Secret | `VPS_KNOWN_HOSTS` | kết quả `ssh-keyscan -p <cổng> <IP VPS>` (chạy trên máy tin cậy) — chống giả mạo máy chủ |
 
