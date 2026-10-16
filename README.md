@@ -159,11 +159,12 @@ docker compose exec -T postgres psql -U kiemhiep -c "UPDATE admins SET disabled=
 
 ## Game server (Godot headless)
 
+**Code nằm ở repo game `kiem-hiep`** (các lệnh dưới chạy TRONG repo game; chúng dùng docker-compose + `.env` của repo này).
 Chế độ MAIN_MAP online: `res://net/server/game_server.tscn` (code trong `net/`). Nghe ENet `:7777` (PC/mobile) và WebSocket
 `:7778` (web), mô phỏng 18 tick/giây, gửi vị trí 9 lần/giây theo lưới tầm nhìn 1024 px (mỗi người thấy 3x3 ô quanh mình).
 
 ```bash
-bash server/dev.sh up            # Docker (giống production): tự xuất gói server (~90 MB, chỉ code + dữ liệu) khi code đổi
+bash server/dev.sh up            # Docker (giống production): tự xuất gói server (~280 MB, code + dữ liệu) khi code đổi, build image kiemhiep-game:local
 bash server/dev.sh local world   # hoặc chạy thẳng bằng Godot trên máy (sửa code nhanh, không cần build lại)
 bash server/dev.sh test          # kiểm thử bằng bot thật (server thử riêng, không đụng server đang chạy)
 ```
