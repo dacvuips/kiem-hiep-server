@@ -73,7 +73,7 @@ docker stack deploy -c deploy/stack.yml --with-registry-auth --prune "${wait_fla
 for s in $(docker secret ls --format '{{.Name}}' | grep '^kh_' || true); do docker secret rm "$s" >/dev/null 2>&1 || true; done
 for c in $(docker config ls --format '{{.Name}}' | grep '^kh_' || true); do docker config rm "$c" >/dev/null 2>&1 || true; done
 
-# Máy chủ 1 vẫn là địa chỉ máy dev (seed) -> trỏ về GAME_PUBLIC_HOST. Admin sửa tay trên web Admin rồi thì không đụng.
+# Máy chủ 1 vẫn là địa chỉ máy dev (seed) -> trỏ về wss://DOMAIN/ws/world (client dùng ws_url). Admin sửa tay trên web Admin rồi thì không đụng.
 pg="$(docker ps -q -f "label=com.docker.swarm.service.name=${STACK}_postgres" | head -n 1)"
 if [ -n "$pg" ]; then
 	for _ in $(seq 1 30); do
@@ -81,7 +81,7 @@ if [ -n "$pg" ]; then
 		sleep 2   # đợi account chạy migrate tạo bảng
 	done
 	docker exec "$pg" psql -U kiemhiep -q -c \
-		"UPDATE game_servers SET host='$GAME_PUBLIC_HOST', ws_url='ws://$GAME_PUBLIC_HOST:7778' WHERE id=1 AND host='127.0.0.1'" || true
+		"UPDATE game_servers SET host='$GAME_PUBLIC_HOST', ws_url='wss://$DOMAIN/ws/world' WHERE id=1 AND host='127.0.0.1'" || true
 fi
 docker image prune -f >/dev/null 2>&1 || true
 docker stack services "$STACK" --format 'table {{.Name}}\t{{.Replicas}}\t{{.Image}}'

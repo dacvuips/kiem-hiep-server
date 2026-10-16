@@ -11,14 +11,13 @@ if ! command -v docker >/dev/null 2>&1; then
 	curl -fsSL https://get.docker.com | sh
 fi
 systemctl enable --now docker
-docker compose version >/dev/null || { echo "Thiếu docker compose plugin" >&2; exit 1; }
+docker compose version >/dev/null 2>&1 || echo "(Không có docker compose plugin — chỉ dùng được chế độ Swarm)"
 
-# SSH, HTTPS, cổng game: thế giới 7777/7778, Tống Kim 7787/7788, Đấu trường 7797/7798, Train chung 7807/7808.
-# KHÔNG mở 5432 (Postgres) và 8080 (account chỉ nghe 127.0.0.1, đi qua Caddy).
+# CHỈ SSH + 80/443 (Caddy). Game server đi qua wss://<DOMAIN>/ws/... trên 443 — KHÔNG mở cổng game (7777...), 5432, 8080.
 ssh_port="$(ss -tlnp 2>/dev/null | awk '/sshd/ {sub(/.*:/, "", $4); print $4; exit}')"
 ssh_port="${ssh_port:-22}"
-tcp=("$ssh_port" 80 443 7778 7788 7798 7808)
-udp=(443 7777 7787 7797 7807)
+tcp=("$ssh_port" 80 443)
+udp=(443)   # HTTP/3
 # KHÔNG tự bật tường lửa (VPS có thể đang chạy dịch vụ khác / Swarm nhiều node) — chỉ thêm luật nếu đã bật.
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
 	echo "== Thêm luật ufw"

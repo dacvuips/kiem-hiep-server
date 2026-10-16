@@ -11,17 +11,23 @@ repo kiem-hiep-server (repo này)            repo game kiem-hiep
                  docker stack deploy kiemhiep (deploy/stack.yml) — image kia giữ nguyên bản đang chạy
 ```
 
+**Chỉ 1 cổng vào: 443 (cộng 80 để lấy chứng chỉ).** Game server không mở cổng nào ra ngoài. Caddy chia theo đường dẫn:
+`wss://<DOMAIN>/ws/world` → game, `/ws/battle` → Tống Kim, `/ws/arena` → Đấu trường, `/ws/field/0` → Train chung,
+mọi đường khác → server tài khoản (API, web). Client dùng WebSocket cho các địa chỉ `wss://` (xem `net/client/net_client.gd`),
+máy dev vẫn dùng ENet/UDP. Lợi ích: có mã hoá TLS sẵn, tường lửa chỉ mở 80/443, và có thể đặt Cloudflare phía trước.
+Đánh đổi: WebSocket chạy trên TCP nên khi mạng di động mất gói, độ trễ có thể giật hơn UDP.
+
 Trên VPS (`/opt/kiemhiep`): `stack.env` (cấu hình thường), `secrets/` (khóa — thành Docker secrets), `client/`
 (gói game cho launcher), `deploy/` (repo này đẩy lên), `backups/`.
 
 ## 1. Cài lần đầu (từ máy dev, Git Bash)
 
-1. **DNS**: bản ghi A `api.<tên miền>` và `game.<tên miền>` -> IP node manager.
+1. **DNS**: MỘT bản ghi A `<DOMAIN>` (VD `kiem-hiep-api.viettheo.site`) -> IP node manager. Không cần tên riêng cho game.
 2. **SSH key** lên VPS: `ssh-keygen -t ed25519` rồi `ssh-copy-id root@<IP>`.
 3. **Docker Hub**: tạo 2 repo **private** `kiemhiep-account`, `kiemhiep-game`. Tạo Access Token (Account settings ->
    Personal access tokens, quyền Read & Write). Trên VPS manager: `docker login -u <HUB>` (để kéo image private).
-4. `cp deploy/deploy.env.example deploy/deploy.env`, điền `HUB`, `VPS`, `DOMAIN`, `GAME_HOST`.
-5. `bash deploy/deploy.sh setup` — luật tường lửa (chỉ khi ufw/firewalld đang bật), lịch sao lưu 03:17.
+4. `cp deploy/deploy.env.example deploy/deploy.env`, điền `HUB`, `VPS`, `DOMAIN` (`GAME_HOST` để trống).
+5. `bash deploy/deploy.sh setup` — luật tường lửa chỉ SSH + 80 + 443 (chỉ khi ufw/firewalld đang bật), lịch sao lưu 03:17.
 6. `bash deploy/deploy.sh env` — tạo `stack.env` + `secrets/` **trên VPS** với khóa mới, in mật khẩu admin tạm (1 lần).
    **Sao lưu `/opt/kiemhiep/secrets/`** ra nơi an toàn (mất `password_pepper` = mất mọi mật khẩu người chơi).
    SMTP: sửa `SMTP_HOST/PORT/USER` trong `stack.env`, mật khẩu ghi vào `secrets/smtp_pass`.
@@ -66,5 +72,10 @@ Sau đó: push lên `main` là tự build + deploy phần thay đổi. Chạy ta
 - Sao lưu tay: `bash /opt/kiemhiep/deploy/backup_db.sh` — giữ 14 bản. **Chép ra máy khác định kỳ.**
 - Khôi phục: `gunzip -c backups/<file>.sql.gz | docker exec -i $(docker ps -q -f label=com.docker.swarm.service.name=kiemhiep_postgres) psql -U kiemhiep kiemhiep`
 - Quên mật khẩu Super Admin: `docker exec -it $(docker ps -q -f label=com.docker.swarm.service.name=kiemhiep_account) /account admin <tên> super`
+- Thêm field server thứ 2: chép service `field` trong `stack.yml` (đổi tên, `GAME_FIELD_INDEX`, 2 cổng nội bộ,
+  `GAME_PUBLIC_WS: wss://${DOMAIN}/ws/field/<index>`) và thêm 1 khối `handle /ws/field/<index>` vào `Caddyfile`.
+- **Cloudflare** (chống DDoS web + game, vì mọi thứ đã đi qua 443): bật đám mây cam cho `<DOMAIN>`, SSL mode **Full (strict)**.
+  Cần chỉnh Caddy để account thấy IP thật (`trusted_proxies` + `client_ip_headers CF-Connecting-IP`) — chưa làm.
+  Cloudflare ngắt WebSocket im lặng quá ~100 giây; game gửi ping định kỳ nên không ảnh hưởng.
 - Đã có Traefik/nginx chiếm 80/443: `swarm_up.sh` dừng và báo — bỏ service `caddy` trong `stack.yml`, trỏ proxy đó tới
   `account:8080` (gắn proxy vào mạng `kiemhiep_kiemhiep`).

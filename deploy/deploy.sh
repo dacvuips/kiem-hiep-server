@@ -22,7 +22,8 @@ cfg() { grep -E "^$1=" "$here/deploy.env" | tail -n 1 | cut -d= -f2- | tr -d '\r
 VPS="$(cfg VPS)"; SSH_PORT="$(cfg SSH_PORT)"; R="$(cfg REMOTE_DIR)"; DOMAIN="$(cfg DOMAIN)"; GAME_HOST="$(cfg GAME_HOST)"
 HUB="$(cfg HUB)"; GAME_REPO="$(cfg GAME_REPO)"
 SSH_PORT="${SSH_PORT:-22}"; R="${R:-/opt/kiemhiep}"; GAME_REPO="${GAME_REPO:-$repo/../kiem-hiep}"
-[ -n "$VPS" ] && [ -n "$DOMAIN" ] && [ -n "$GAME_HOST" ] && [ -n "$HUB" ] || die "deploy.env thiếu VPS / DOMAIN / GAME_HOST / HUB"
+GAME_HOST="${GAME_HOST:-$DOMAIN}"   # game đi qua cổng 443 của DOMAIN (wss://DOMAIN/ws/...), không cần địa chỉ riêng
+[ -n "$VPS" ] && [ -n "$DOMAIN" ] && [ -n "$HUB" ] || die "deploy.env thiếu VPS / DOMAIN / HUB"
 case "$VPS" in *1.2.3.4*) die "deploy.env vẫn là giá trị mẫu";; esac
 
 ssh_() { ssh -p "$SSH_PORT" -o ServerAliveInterval=30 "$VPS" "$@"; }

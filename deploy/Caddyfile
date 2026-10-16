@@ -1,7 +1,24 @@
-# HTTPS cho server tài khoản (API, web Admin, trang người chơi, gói game cho launcher). Caddy tự lấy chứng chỉ Let's Encrypt.
+# CỔNG VÀO DUY NHẤT (80/443): API, web Admin, trang người chơi, gói game cho launcher VÀ cả 4 game server qua WebSocket (wss://).
+# Caddy tự lấy chứng chỉ Let's Encrypt. Game server không mở cổng nào ra ngoài — chỉ Caddy nói chuyện với chúng trong mạng Swarm.
+# Thêm 1 field server: thêm 1 dòng handle /ws/field/<index> (index = GAME_FIELD_INDEX) tương ứng trong stack.yml.
 {$DOMAIN} {
-	# Gói .pck đã nén sẵn + cần tải tiếp (Range) -> không nén lại.
-	@compress not path /client/files/*
-	encode @compress zstd gzip
-	reverse_proxy account:8080
+	handle /ws/world {
+		reverse_proxy game:7778
+	}
+	handle /ws/battle {
+		reverse_proxy battle:7788
+	}
+	handle /ws/arena {
+		reverse_proxy arena:7798
+	}
+	handle /ws/field/0 {
+		reverse_proxy field:7808
+	}
+	# Mọi đường khác -> server tài khoản.
+	handle {
+		# Gói .pck đã nén sẵn + cần tải tiếp (Range) -> không nén lại.
+		@compress not path /client/files/*
+		encode @compress zstd gzip
+		reverse_proxy account:8080
+	}
 }

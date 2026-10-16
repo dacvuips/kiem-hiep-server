@@ -8,8 +8,8 @@
 #
 # Mọi service đặt trên node có nhãn kiemhiep.main=true (swarm_up.sh tự gắn cho manager nếu chưa node nào có):
 # Postgres giữ dữ liệu ở volume cục bộ, account đọc gói game ở ${KH_DIR}/client, cổng mở kiểu "host" ở node đó.
-# Cổng mode: host (không qua routing mesh) để server thấy IP thật của người chơi (giới hạn yêu cầu theo IP)
-# và người chơi kết nối đúng node có game server (GAME_PUBLIC_HOST).
+# Chỉ Caddy mở cổng (80/443, mode host để account thấy IP thật của người chơi). Game server KHÔNG mở cổng nào:
+# người chơi vào bằng wss://<DOMAIN>/ws/... (Caddyfile), game server báo địa chỉ đó lên account qua GAME_PUBLIC_WS.
 version: "3.8"
 
 x-main-node: &main-node
@@ -99,50 +99,42 @@ services:
     <<: *game
     environment:
       <<: *game-env
-    ports:
-      - { target: 7777, published: 7777, protocol: udp, mode: host }
-      - { target: 7778, published: 7778, protocol: tcp, mode: host }
+      GAME_PUBLIC_WS: wss://${DOMAIN}/ws/world
 
   # Chiến trường Tống Kim.
   battle:
     <<: *game
     environment:
       <<: *game-env
+      GAME_PUBLIC_WS: wss://${DOMAIN}/ws/battle
       GAME_BATTLE: "1"
       GAME_MAP_DIR: res://world/maps/map_378
       GAME_ENET_PORT: "7787"
       GAME_WS_PORT: "7788"
       GAME_BATTLE_SIGNUP: "600"
       GAME_BATTLE_FIGHT: "3600"
-    ports:
-      - { target: 7787, published: 7787, protocol: udp, mode: host }
-      - { target: 7788, published: 7788, protocol: tcp, mode: host }
 
   # Đấu trường PK.
   arena:
     <<: *game
     environment:
       <<: *game-env
+      GAME_PUBLIC_WS: wss://${DOMAIN}/ws/arena
       GAME_ARENA: "1"
       GAME_MAP_DIR: res://world/maps/map_397
       GAME_ENET_PORT: "7797"
       GAME_WS_PORT: "7798"
-    ports:
-      - { target: 7797, published: 7797, protocol: udp, mode: host }
-      - { target: 7798, published: 7798, protocol: tcp, mode: host }
 
   # Phòng train chung Vượt Ải.
   field:
     <<: *game
     environment:
       <<: *game-env
+      GAME_PUBLIC_WS: wss://${DOMAIN}/ws/field/0
       GAME_FIELD: "1"
       GAME_FIELD_INDEX: "0"
       GAME_ENET_PORT: "7807"
       GAME_WS_PORT: "7808"
-    ports:
-      - { target: 7807, published: 7807, protocol: udp, mode: host }
-      - { target: 7808, published: 7808, protocol: tcp, mode: host }
 
 networks:
   kiemhiep:
