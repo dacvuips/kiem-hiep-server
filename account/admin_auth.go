@@ -342,6 +342,7 @@ func (s *server) handleAdmin2FAEnable(w http.ResponseWriter, r *http.Request) er
 	}
 	step, ok := verifyTOTP(secret, req.Code, a.totpLastStep, time.Now())
 	if !ok {
+		debugTOTP("enable", secret, req.Code, a.totpLastStep) // TẠM — gỡ sau khi tìm ra lỗi 2FA
 		return errTOTPWrong
 	}
 	if _, err := s.db.Exec(r.Context(), `UPDATE admins SET totp_enabled=true, totp_last_step=$2 WHERE id=$1`, a.ID, step); err != nil {
