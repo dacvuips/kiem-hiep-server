@@ -94,7 +94,8 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
       - name: Đẩy deploy/ + docker stack deploy
         run: |
-          tar -czf - --exclude=./deploy/deploy.env ./deploy | ssh -p "$PORT" "$VPS" "mkdir -p '$DIR' && tar -xzf - -C '$DIR'"
-          ssh -p "$PORT" "$VPS" "cd '$DIR' && bash deploy/swarm_up.sh '$HUB' 'account=$TAG'"
+          SSH_OPTS="-o ServerAliveInterval=30 -o ServerAliveCountMax=10 -p $PORT"
+          tar -czf - --exclude=./deploy/deploy.env ./deploy | ssh $SSH_OPTS "$VPS" "mkdir -p '$DIR' && tar -xzf - -C '$DIR'"
+          ssh $SSH_OPTS "$VPS" "cd '$DIR' && bash deploy/swarm_up.sh '$HUB' 'account=$TAG'"
       - name: Kiểm tra https://DOMAIN/healthz
         run: curl -fsS --retry 10 --retry-delay 6 --retry-all-errors "https://$DOMAIN/healthz"
