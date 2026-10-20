@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import clsx from 'clsx'
-import { Coins, LogOut, Menu, Swords, User, X } from 'lucide-react'
+import { Coins, LogOut, Menu, User, X } from 'lucide-react'
 import { useAuth, useWallet } from '../lib/auth'
 import { fmtXu } from '../lib/format'
 
