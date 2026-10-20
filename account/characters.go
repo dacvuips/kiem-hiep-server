@@ -280,7 +280,8 @@ func (s *server) handleSaveCharacter(w http.ResponseWriter, r *http.Request) err
 	if err := json.Unmarshal(req.Data, &incoming); err != nil || incoming == nil {
 		return errBadRequest
 	}
-	if !s.cfg.DevTrustClientSaves {
+	// Lưu từ game (ngoài map): tài khoản GM (hoặc DevTrustClientSaves) được lưu nguyên vẹn mọi thay đổi từ test.
+	if !s.cfg.DevTrustClientSaves && !s.isGM(a) {
 		incoming = guardClientSave(oldData, incoming)
 	}
 	keepAdminGrants(oldData, incoming)

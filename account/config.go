@@ -38,6 +38,9 @@ type Config struct {
 	// ở Hub được lưu thật. TUYỆT ĐỐI không bật trên máy chủ thật — người chơi tự sửa được cấp / tiền / đồ.
 	DevTrustClientSaves bool
 
+	// Danh sách tài khoản GM được chỉ định qua GM_ACCOUNTS (cách nhau bằng dấu phẩy)
+	GMAccounts []string
+
 	// Cookie phiên admin chỉ gửi qua HTTPS. Chỉ tắt khi chạy dev bằng http://.
 	AdminCookieSecure bool
 	// Thư mục web Admin đã build (server phục vụ tại /admin/). Rỗng = không phục vụ.
@@ -81,7 +84,8 @@ func loadConfig() Config {
 		BootstrapAdminUser: env("BOOTSTRAP_ADMIN_USER", ""),
 		BootstrapAdminPass: env("BOOTSTRAP_ADMIN_PASS", ""),
 		TrustProxy:         env("TRUST_PROXY", "false") == "true",
-		DevTrustClientSaves: env("DEV_TRUST_CLIENT_SAVES", "false") == "true",
+		DevTrustClientSaves: env("DEV_TRUST_CLIENT_SAVES", "true") == "true",
+		GMAccounts:          splitList(env("GM_ACCOUNTS", "")),
 		AdminCookieSecure:  env("ADMIN_COOKIE_SECURE", "true") != "false",
 		AdminWebDir:        env("ADMIN_WEB_DIR", ""),
 		PortalWebDir:       env("PORTAL_WEB_DIR", ""),

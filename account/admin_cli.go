@@ -54,3 +54,33 @@ func adminCLI(ctx context.Context, cfg Config, keys *keyring, args []string) {
 	}
 	fmt.Printf("Admin %q (%s) — mật khẩu tạm: %s\nĐăng nhập web Admin, đổi mật khẩu và bật xác thực 2 lớp.\n", username, role, temp)
 }
+
+// setGmCLI gán quyền GM cho tài khoản người chơi:
+//   docker compose exec account /account set-gm <tên> [true|false]
+func setGmCLI(ctx context.Context, cfg Config, args []string) {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "cách dùng: account set-gm <tên> [true|false]")
+		os.Exit(2)
+	}
+	username := normUsername(args[0])
+	isGM := true
+	if len(args) >= 2 {
+		isGM = args[1] == "true" || args[1] == "1"
+	}
+	db, err := openDB(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+	if err := migrate(ctx, db); err != nil {
+		log.Fatal(err)
+	}
+	tag, err := db.Exec(ctx, `UPDATE accounts SET is_gm=$2 WHERE username=$1`, username, isGM)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if tag.RowsAffected() == 0 {
+		log.Fatalf("không tìm thấy tài khoản %q", username)
+	}
+	fmt.Printf("Tài khoản %q: quyền GM = %v\n", username, isGM)
+}

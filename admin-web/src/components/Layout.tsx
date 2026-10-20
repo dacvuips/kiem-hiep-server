@@ -23,9 +23,7 @@ const NAV = [
 export function Logo() {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-fg shadow-sm">
-        <span className="text-[15px] font-bold leading-none">KH</span>
-      </div>
+      <img src="/logo.png" alt="Kiếm Hiệp" className="h-9 w-auto object-contain" />
       <div className="leading-tight">
         <div className="text-sm font-semibold">Kiếm Hiệp</div>
         <div className="text-xs text-muted">Quản trị</div>

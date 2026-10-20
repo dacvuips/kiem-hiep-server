@@ -21,10 +21,19 @@
 	handle /ws/field/0 {
 		reverse_proxy field:7808
 	}
+	# Trang tải game và file APK
+	handle_path /download* {
+		root * /var/www/download
+		file_server
+	}
+	handle /tai-game* {
+		redir /download/ 302
+	}
+
 	# Mọi đường khác -> server tài khoản.
 	handle {
-		# Gói .pck đã nén sẵn + cần tải tiếp (Range) -> không nén lại.
-		@compress not path /client/files/*
+		# Gói .pck và .apk đã nén sẵn + cần tải tiếp (Range) -> không nén lại.
+		@compress not path /client/files/* /download/*.apk
 		encode @compress zstd gzip
 		reverse_proxy account:8080
 	}

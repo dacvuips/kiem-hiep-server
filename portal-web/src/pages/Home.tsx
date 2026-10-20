@@ -15,8 +15,10 @@ function Hero() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_45%_50%_at_50%_45%,rgba(13,9,7,0.75),transparent)]" />
       <div className="relative mx-auto w-full max-w-4xl px-4 py-20 text-center">
         <p className="animate-rise font-serif text-xs uppercase tracking-[0.5em] text-gold-300/90 sm:text-sm">Giang hồ hiểm ác — anh hùng xuất thiếu niên</p>
-        <h1 className="title-gold mt-5 animate-rise text-6xl leading-tight [animation-delay:80ms] sm:text-8xl">Kiếm Hiệp</h1>
-        <div className="mx-auto mt-3 flex max-w-md animate-rise items-center gap-3 [animation-delay:140ms]">
+        <div className="mt-5 flex justify-center animate-rise [animation-delay:80ms]">
+          <img src="/img/logo.png" alt="Kiếm Hiệp — JX1 Idle Origin" className="h-28 w-auto max-w-[85%] object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,0.8)] sm:h-36 md:h-44" />
+        </div>
+        <div className="mx-auto mt-4 flex max-w-md animate-rise items-center gap-3 [animation-delay:140ms]">
           <span className="divider-gold" />
           <span className="seal-stamp h-8 w-8 shrink-0 text-sm">Võ</span>
           <span className="divider-gold" />
@@ -145,10 +147,19 @@ function Features() {
   )
 }
 
-const PLATFORMS = [
-  { icon: Monitor, name: 'PC (Windows)', req: ['Windows 10/11 64-bit', 'CPU 2 nhân, RAM 4 GB', 'Card đồ hoạ hỗ trợ OpenGL 3.3', 'Dung lượng trống 2 GB'] },
-  { icon: Smartphone, name: 'Android', req: ['Android 8.0 trở lên', 'RAM 3 GB trở lên', 'Dung lượng trống 1,5 GB', 'Kết nối Wi‑Fi hoặc 4G'] },
-  { icon: Globe, name: 'Chơi trên web', req: ['Chrome, Edge, Firefox bản mới', 'Hỗ trợ WebGL 2', 'RAM 4 GB trở lên', 'Không cần cài đặt'] },
+interface PlatformInfo {
+  icon: typeof Monitor
+  name: string
+  req: string[]
+  action?: string
+  href?: string
+  qrHref?: string
+}
+
+const PLATFORMS: PlatformInfo[] = [
+  { icon: Monitor, name: 'PC (Windows)', req: ['Windows 10/11 64-bit', 'CPU 2 nhân, RAM 4 GB', 'Card đồ hoạ hỗ trợ OpenGL 3.3', 'Dung lượng trống 2 GB'], action: 'Sắp ra mắt' },
+  { icon: Smartphone, name: 'Android', req: ['Android 8.0 trở lên', 'RAM 3 GB trở lên', 'Dung lượng trống 1,5 GB', 'Kết nối Wi‑Fi hoặc 4G'], action: 'Tải APK Launcher (35 MB)', href: 'https://kiem-hiep-api.viettheo.site/download/kiem-hiep-launcher.apk', qrHref: 'https://kiem-hiep-api.viettheo.site/download/' },
+  { icon: Globe, name: 'Chơi trên web', req: ['Chrome, Edge, Firefox bản mới', 'Hỗ trợ WebGL 2', 'RAM 4 GB trở lên', 'Không cần cài đặt'], action: 'Sắp ra mắt' },
 ]
 
 function DownloadSection() {
@@ -174,9 +185,22 @@ function DownloadSection() {
                   </li>
                 ))}
               </ul>
-              <button className="btn-ghost mt-6 w-full" disabled>
-                <Download className="h-4 w-4" aria-hidden /> Sắp ra mắt
-              </button>
+              {p.href ? (
+                <div className="mt-6 flex flex-col gap-2">
+                  <a href={p.href} download="kiem-hiep-launcher.apk" className="btn-gold flex w-full items-center justify-center gap-2 py-2.5 font-bold shadow-glow">
+                    <Download className="h-4 w-4" aria-hidden /> {p.action}
+                  </a>
+                  {p.qrHref && (
+                    <a href={p.qrHref} className="text-center text-xs text-gold-400/90 underline-offset-4 hover:underline">
+                      📱 Quét mã QR cài đặt nhanh
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <button className="btn-ghost mt-6 w-full" disabled>
+                  <Download className="h-4 w-4" aria-hidden /> {p.action || 'Sắp ra mắt'}
+                </button>
+              )}
             </div>
           ))}
         </div>

@@ -83,7 +83,10 @@ services:
       SITE_ADDR: ${SITE_ADDR}   # public: <DOMAIN> (Caddy lấy chứng chỉ) | proxy: :80 (HTTP nội bộ, proxy có sẵn lo TLS)
     configs:
       - { source: caddyfile, target: /etc/caddy/Caddyfile }
-    volumes: [caddy_data:/data, caddy_config:/config]
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - { type: bind, source: "${KH_DIR}/download", target: /var/www/download, read_only: true }
     # Cổng 80/443 do deploy/stack.public.yml thêm vào (chế độ public). Chế độ proxy: không mở cổng nào.
     networks: [kiemhiep]
     deploy:

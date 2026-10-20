@@ -62,6 +62,15 @@ type sessionResp struct {
 	Account      accountView `json:"account"`
 }
 
+type accountView struct {
+	ID          int64  `json:"id"`
+	Username    string `json:"username"`
+	Email       string `json:"email"`
+	HasPassword bool   `json:"has_password"`
+	Google      bool   `json:"google_linked"`
+	IsGM        bool   `json:"is_gm"`
+}
+
 type accountRow struct {
 	ID           int64
 	Username     string
@@ -73,17 +82,43 @@ type accountRow struct {
 	BanReason    string
 	// Token cấp trước mốc này bị từ chối (đổi/đặt lại mật khẩu = đá mọi phiên đang mở, kể cả access token còn hạn).
 	PasswordChangedAt time.Time
+	IsGM         bool
 }
 
-func (a accountRow) view() accountView {
-	return accountView{ID: a.ID, Username: a.Username, Email: a.Email, HasPassword: a.PasswordHash != "", Google: a.GoogleSub != nil}
+func (s *server) isGM(a accountRow) bool {
+	if a.IsGM {
+		return true
+	}
+	for _, gm := range s.cfg.GMAccounts {
+		if strings.EqualFold(a.Username, strings.TrimSpace(gm)) {
+			return true
+		}
+	}
+	var role string
+	if err := s.db.QueryRow(context.Background(), `SELECT role FROM admins WHERE lower(username)=lower($1) AND NOT disabled`, a.Username).Scan(&role); err == nil {
+		if role == "gm" || role == "super" {
+			return true
+		}
+	}
+	return false
 }
 
-const accountCols = `id, username, email, password_hash, google_sub, status, banned_until, ban_reason, password_changed_at`
+func (s *server) accountView(a accountRow) accountView {
+	return accountView{
+		ID:          a.ID,
+		Username:    a.Username,
+		Email:       a.Email,
+		HasPassword: a.PasswordHash != "",
+		Google:      a.GoogleSub != nil,
+		IsGM:        s.isGM(a),
+	}
+}
+
+const accountCols = `id, username, email, password_hash, google_sub, status, banned_until, ban_reason, password_changed_at, is_gm`
 
 func scanAccount(row pgx.Row) (accountRow, error) {
 	var a accountRow
-	err := row.Scan(&a.ID, &a.Username, &a.Email, &a.PasswordHash, &a.GoogleSub, &a.Status, &a.BannedUntil, &a.BanReason, &a.PasswordChangedAt)
+	err := row.Scan(&a.ID, &a.Username, &a.Email, &a.PasswordHash, &a.GoogleSub, &a.Status, &a.BannedUntil, &a.BanReason, &a.PasswordChangedAt, &a.IsGM)
 	return a, err
 }
 
@@ -205,7 +240,7 @@ func (s *server) issue(ctx context.Context, a accountRow, r *http.Request) (sess
 	if err != nil {
 		return sessionResp{}, err
 	}
-	return sessionResp{AccessToken: access, RefreshToken: refresh, ExpiresIn: int(s.cfg.AccessTTL.Seconds()), Account: a.view()}, nil
+	return sessionResp{AccessToken: access, RefreshToken: refresh, ExpiresIn: int(s.cfg.AccessTTL.Seconds()), Account: s.accountView(a)}, nil
 }
 
 func (s *server) logLogin(ctx context.Context, id int64, ok bool, method string, r *http.Request) {
@@ -574,5 +609,5 @@ func (s *server) handleMe(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	return writeJSON(w, http.StatusOK, a.view())
+	return writeJSON(w, http.StatusOK, s.accountView(a))
 }

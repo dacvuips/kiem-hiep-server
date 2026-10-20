@@ -17,12 +17,13 @@ const (
 )
 
 type rankingEntry struct {
-	Rank   int    `json:"rank"`
-	Name   string `json:"name"`
-	Level  int    `json:"level"`
-	SectID string `json:"sect_id"`
-	Gender int    `json:"gender"`
-	Money  int64  `json:"money"`
+	Rank     int    `json:"rank"`
+	Name     string `json:"name"`
+	Level    int    `json:"level"`
+	SectID   string `json:"sect_id"`
+	Gender   int    `json:"gender"`
+	Money    int64  `json:"money"`
+	PkPoints int    `json:"pk_points,omitempty"`
 }
 
 type rankingBoard struct {
@@ -30,6 +31,7 @@ type rankingBoard struct {
 	UpdatedAt  time.Time                 `json:"updated_at"`
 	Level      []rankingEntry            `json:"level"`
 	Money      []rankingEntry            `json:"money"`
+	PK         []rankingEntry            `json:"pk"`
 	SectLevel  map[string][]rankingEntry `json:"sect_level"`
 	SectMoney  map[string][]rankingEntry `json:"sect_money"`
 	TTLSeconds int                       `json:"ttl_seconds"`
@@ -45,7 +47,8 @@ const rankingCTE = `WITH c AS (
 	SELECT id, name, sect_id, gender, level,
 		CASE WHEN jsonb_typeof(data->'exp') = 'number' THEN (data->>'exp')::numeric ELSE 0 END AS exp,
 		(CASE WHEN jsonb_typeof(data->'gold') = 'number' THEN (data->>'gold')::numeric ELSE 0 END
-		 + CASE WHEN jsonb_typeof(data->'storage_gold') = 'number' THEN (data->>'storage_gold')::numeric ELSE 0 END)::bigint AS money
+		 + CASE WHEN jsonb_typeof(data->'storage_gold') = 'number' THEN (data->>'storage_gold')::numeric ELSE 0 END)::bigint AS money,
+		CASE WHEN jsonb_typeof(data->'pk_points') = 'number' THEN (data->>'pk_points')::bigint ELSE 0 END AS pk_points
 	FROM characters WHERE server_id = $1 AND deleted_at IS NULL
 )`
 
@@ -55,6 +58,9 @@ SELECT 'level', '', name, sect_id, gender, level, money, rn FROM (
 UNION ALL
 SELECT 'money', '', name, sect_id, gender, level, money, rn FROM (
 	SELECT *, ROW_NUMBER() OVER (ORDER BY money DESC, level DESC, id) AS rn FROM c WHERE money > 0) t WHERE rn <= $2
+UNION ALL
+SELECT 'pk', '', name, sect_id, gender, level, pk_points, rn FROM (
+	SELECT *, ROW_NUMBER() OVER (ORDER BY pk_points DESC, level DESC, id) AS rn FROM c WHERE pk_points > 0) t WHERE rn <= $2
 UNION ALL
 SELECT 'sect_level', sect_id, name, sect_id, gender, level, money, rn FROM (
 	SELECT *, ROW_NUMBER() OVER (PARTITION BY sect_id ORDER BY level DESC, exp DESC, id) AS rn FROM c WHERE sect_id <> '') t WHERE rn <= $3
@@ -83,7 +89,7 @@ func (s *server) handleRankings(w http.ResponseWriter, r *http.Request) error {
 	}
 	defer rows.Close()
 	b := &rankingBoard{ServerID: serverID, UpdatedAt: time.Now(), Level: []rankingEntry{}, Money: []rankingEntry{},
-		SectLevel: map[string][]rankingEntry{}, SectMoney: map[string][]rankingEntry{}, TTLSeconds: int(rankingTTL.Seconds())}
+		PK: []rankingEntry{}, SectLevel: map[string][]rankingEntry{}, SectMoney: map[string][]rankingEntry{}, TTLSeconds: int(rankingTTL.Seconds())}
 	for rows.Next() {
 		var board, sect string
 		var e rankingEntry
@@ -97,6 +103,9 @@ func (s *server) handleRankings(w http.ResponseWriter, r *http.Request) error {
 			b.Level = append(b.Level, e)
 		case "money":
 			b.Money = append(b.Money, e)
+		case "pk":
+			e.PkPoints = int(e.Money)
+			b.PK = append(b.PK, e)
 		case "sect_level":
 			b.SectLevel[sect] = append(b.SectLevel[sect], e)
 		case "sect_money":

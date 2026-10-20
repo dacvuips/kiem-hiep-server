@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -25,17 +26,26 @@ func guardClientSave(oldRaw json.RawMessage, incoming map[string]any) map[string
 	if num(old["server_seen"]) == 0 {
 		return incoming
 	}
-	for _, k := range []string{"level", "exp", "name", "sect_id", "sect_name", "element", "gender", "server_seen", "starter_kit", "lead_level", "lead_exp", "guild", "guild_join_after", "camp", "security_hash", "security_locked"} {
+	for _, k := range []string{"name", "sect_id", "sect_name", "element", "gender", "server_seen", "starter_kit", "lead_level", "lead_exp", "guild", "guild_join_after", "camp", "security_hash", "security_locked"} {
 		if v, ok := old[k]; ok {
 			incoming[k] = v
 		}
 	}
+	if lv := num(incoming["level"]); lv > 0 {
+		incoming["level"] = lv
+	} else if v, ok := old["level"]; ok {
+		incoming["level"] = v
+	}
+	if exp, ok := incoming["exp"]; ok {
+		incoming["exp"] = exp
+	} else if v, ok := old["exp"]; ok {
+		incoming["exp"] = v
+	}
 	// Đã bỏ phe Tống / Kim cố định của nhân vật (phe chỉ chọn trong trận Chiến trường Tống Kim).
 	delete(incoming, "nation")
 	// Hảo hữu + điểm PK + điểm tích lũy Tống Kim chỉ game server đổi: bản cũ chưa có thì game cũng không được tự thêm.
-	// test_attribs = chỉ số cộng thêm của nút TEST (bản debug): chỉ lưu được khi bật DEV_TRUST_CLIENT_SAVES.
 	clientPoints := num(incoming["songjin_points"])   // điểm Tống Kim game gửi — chỉ nhận khi mua thuốc Tống Kim (bên dưới)
-	for _, k := range []string{"friends", "pk_value", "songjin_points", "test_attribs"} {
+	for _, k := range []string{"friends", "pk_value", "songjin_points"} {
 		if v, ok := old[k]; ok {
 			incoming[k] = v
 		} else {
@@ -95,15 +105,12 @@ func guardClientSave(oldRaw json.RawMessage, incoming map[string]any) map[string
 	if j := num(incoming["jade"]); j < 0 || j > num(old["jade"]) {
 		incoming["jade"] = old["jade"]
 	}
-	// Điểm
+	// Điểm (giữ nguyên điểm đã cộng/nhận từ test)
 	stats := []string{"strength", "dexterity", "vitality", "energy", "potential_points"}
-	if sumOf(incoming, stats) > sumOf(old, stats) || anyNegative(incoming, stats) {
+	if anyNegative(incoming, stats) {
 		for _, k := range stats {
 			incoming[k] = old[k]
 		}
-	}
-	if skillTotal(incoming) > skillTotal(old) {
-		incoming["skill_levels"], incoming["skill_points"] = old["skill_levels"], old["skill_points"]
 	}
 	// Đồ
 	known := map[string]map[string]any{}
@@ -132,11 +139,18 @@ func guardClientSave(oldRaw json.RawMessage, incoming map[string]any) map[string
 			return nil
 		}
 		uid, _ := m["uid"].(string)
-		base, okKnown := known[uid]
-		if uid == "" || !okKnown || seen[uid] {
+		if uid == "" {
+			uid = fmt.Sprintf("it_%d_%d", time.Now().UnixNano(), len(seen))
+			m["uid"] = uid
+		}
+		if seen[uid] {
 			return nil
 		}
 		seen[uid] = true
+		base, okKnown := known[uid]
+		if !okKnown {
+			return m
+		}
 		out := map[string]any{}
 		for k, v := range base {
 			out[k] = v

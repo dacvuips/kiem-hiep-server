@@ -60,7 +60,7 @@ func (s *server) handleInternalJoin(w http.ResponseWriter, r *http.Request) erro
 	var muted *time.Time
 	s.db.QueryRow(r.Context(), `SELECT muted_until FROM accounts WHERE id=$1`, a.ID).Scan(&muted)
 	return writeJSON(w, http.StatusOK, map[string]any{
-		"account":   map[string]any{"id": a.ID, "username": a.Username, "muted_until": muted},
+		"account":   map[string]any{"id": a.ID, "username": a.Username, "muted_until": muted, "is_gm": s.isGM(a)},
 		"character": c,
 	})
 }

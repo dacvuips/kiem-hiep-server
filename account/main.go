@@ -26,6 +26,10 @@ func main() {
 		adminCLI(ctx, cfg, keys, os.Args[2:])
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "set-gm" {
+		setGmCLI(ctx, cfg, os.Args[2:])
+		return
+	}
 
 	db, err := openDB(ctx, cfg.DatabaseURL)
 	if err != nil {

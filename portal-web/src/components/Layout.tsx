@@ -15,14 +15,18 @@ const NAV = [
 
 export function Logo({ compact }: { compact?: boolean }) {
   return (
-    <Link to="/" className="group flex items-center gap-2.5" aria-label="Kiếm Hiệp — Trang chủ">
-      <span className="relative flex h-10 w-10 items-center justify-center rounded-sm border-2 border-seal-400/80 bg-gradient-to-b from-seal-500 to-seal-700 shadow-[0_0_18px_rgba(195,48,43,0.45)] transition group-hover:rotate-[-4deg]">
-        <Swords className="h-5 w-5 text-parch-50" aria-hidden />
-      </span>
-      <span className="flex flex-col leading-none">
-        <span className="title-gold text-xl sm:text-2xl">Kiếm Hiệp</span>
-        {!compact && <span className="mt-1 hidden text-[10px] uppercase tracking-[0.28em] text-gold-500/80 sm:block">Võ lâm truyền kỳ</span>}
-      </span>
+    <Link to="/" className="group flex items-center gap-3" aria-label="Kiếm Hiệp — Trang chủ">
+      <img
+        src="/img/logo.png"
+        alt="Kiếm Hiệp"
+        className="h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-105 sm:h-12"
+      />
+      {!compact && (
+        <span className="flex flex-col leading-none">
+          <span className="title-gold text-lg sm:text-xl">Kiếm Hiệp</span>
+          <span className="mt-1 hidden text-[10px] uppercase tracking-[0.22em] text-gold-500/80 sm:block">JX1 Idle Origin</span>
+        </span>
+      )}
     </Link>
   )
 }
