@@ -154,27 +154,29 @@ interface PlatformInfo {
   action?: string
   href?: string
   qrHref?: string
+  downloadName?: string
 }
 
 const PLATFORMS: PlatformInfo[] = [
   { icon: Monitor, name: 'PC (Windows)', req: ['Windows 10/11 64-bit', 'CPU 2 nhân, RAM 4 GB', 'Card đồ hoạ hỗ trợ OpenGL 3.3', 'Dung lượng trống 2 GB'], action: 'Sắp ra mắt' },
-  { icon: Smartphone, name: 'Android', req: ['Android 8.0 trở lên', 'RAM 3 GB trở lên', 'Dung lượng trống 1,5 GB', 'Kết nối Wi‑Fi hoặc 4G'], action: 'Tải APK Launcher (35 MB)', href: 'https://kiem-hiep-api.viettheo.site/download/kiem-hiep-launcher.apk', qrHref: 'https://kiem-hiep-api.viettheo.site/download/' },
-  { icon: Globe, name: 'Chơi trên web', req: ['Chrome, Edge, Firefox bản mới', 'Hỗ trợ WebGL 2', 'RAM 4 GB trở lên', 'Không cần cài đặt'], action: 'Sắp ra mắt' },
+  { icon: Smartphone, name: 'Android', req: ['Android 8.0 trở lên', 'RAM 3 GB trở lên', 'Dung lượng trống 1,5 GB', 'Kết nối Wi‑Fi hoặc 4G'], action: 'Tải APK Launcher (35 MB)', href: 'https://kiem-hiep-api.viettheo.site/download/kiem-hiep-launcher.apk', qrHref: 'https://kiem-hiep-api.viettheo.site/download/', downloadName: 'kiem-hiep-launcher.apk' },
+  { icon: Smartphone, name: 'iOS (iPhone / iPad)', req: ['iOS 13.0 trở lên', 'RAM 3 GB trở lên', 'Dung lượng trống 1,5 GB', 'Cài qua Scarlet, AltStore hoặc TrollStore'], action: 'Tải IPA Launcher (35 MB)', href: 'https://kiem-hiep-api.viettheo.site/download/kiem-hiep-launcher.ipa', qrHref: 'https://kiem-hiep-api.viettheo.site/download/', downloadName: 'kiem-hiep-launcher.ipa' },
+  { icon: Globe, name: 'Chơi trên web', req: ['Chrome, Edge, Safari bản mới', 'Hỗ trợ WebGL 2', 'RAM 4 GB trở lên', 'Không cần cài đặt'], action: 'Sắp ra mắt' },
 ]
 
 function DownloadSection() {
   return (
     <section id="tai-game" className="download-bg scroll-mt-16 py-20 sm:py-24">
-      <div className="mx-auto max-w-6xl px-4">
-        <SectionTitle kicker="Tải game" title="Hướng Dẫn Tải Game" sub="Kiếm Hiệp sẽ có mặt trên PC, Android và trình duyệt. Dùng chung một tài khoản trên mọi nền tảng." />
-        <div className="grid gap-6 md:grid-cols-3">
+      <div className="mx-auto max-w-7xl px-4">
+        <SectionTitle kicker="Tải game" title="Hướng Dẫn Tải Game" sub="Kiếm Hiệp sẽ có mặt trên PC, Android, iOS và trình duyệt. Dùng chung một tài khoản trên mọi nền tảng." />
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {PLATFORMS.map((p) => (
             <div key={p.name} className="frame flex flex-col p-6">
               <div className="flex items-center gap-3">
                 <span className="flex h-12 w-12 items-center justify-center rounded-full border border-gold-500/60 bg-ink-800 text-gold-300 shadow-glow">
                   <p.icon className="h-6 w-6" aria-hidden />
                 </span>
-                <h3 className="title-gold text-xl">{p.name}</h3>
+                <h3 className="title-gold text-lg">{p.name}</h3>
               </div>
               <h4 className="mt-5 text-xs font-semibold uppercase tracking-wider text-parch-300/60">Cấu hình đề nghị</h4>
               <ul className="mt-2 flex-1 space-y-1.5 text-sm text-parch-200/80">
@@ -187,7 +189,7 @@ function DownloadSection() {
               </ul>
               {p.href ? (
                 <div className="mt-6 flex flex-col gap-2">
-                  <a href={p.href} download="kiem-hiep-launcher.apk" className="btn-gold flex w-full items-center justify-center gap-2 py-2.5 font-bold shadow-glow">
+                  <a href={p.href} download={p.downloadName} className="btn-gold flex w-full items-center justify-center gap-2 py-2.5 font-bold shadow-glow text-sm">
                     <Download className="h-4 w-4" aria-hidden /> {p.action}
                   </a>
                   {p.qrHref && (
@@ -197,7 +199,7 @@ function DownloadSection() {
                   )}
                 </div>
               ) : (
-                <button className="btn-ghost mt-6 w-full" disabled>
+                <button className="btn-ghost mt-6 w-full text-sm" disabled>
                   <Download className="h-4 w-4" aria-hidden /> {p.action || 'Sắp ra mắt'}
                 </button>
               )}
