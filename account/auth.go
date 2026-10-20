@@ -47,14 +47,6 @@ type server struct {
 	userRL     *rateLimiter // đăng nhập sai / quên mật khẩu, theo tên tài khoản
 }
 
-type accountView struct {
-	ID          int64  `json:"id"`
-	Username    string `json:"username"`
-	Email       string `json:"email"`
-	HasPassword bool   `json:"has_password"`
-	Google      bool   `json:"google_linked"`
-}
-
 type sessionResp struct {
 	AccessToken  string      `json:"access_token"`
 	RefreshToken string      `json:"refresh_token"`
