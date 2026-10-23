@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -69,6 +71,13 @@ func (s *server) handleInternalField(w http.ResponseWriter, r *http.Request) err
 	fieldStates.Lock()
 	fieldStates.m[fieldKey{st.ServerID, st.Index}] = st
 	fieldStates.Unlock()
+
+	if s.redis != nil {
+		if raw, err := json.Marshal(st); err == nil {
+			_ = s.redis.Set(r.Context(), fmt.Sprintf("game:field:%d:%d", st.ServerID, st.Index), string(raw), 15*time.Second)
+		}
+	}
+
 	return writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

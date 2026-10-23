@@ -1,6 +1,9 @@
 # Khóa máy dev — KHÔNG commit
 .env
 deploy/deploy.env
+ai_agent/config.json
+ai_agent/task_history.csv
+ai_agent/screenshots/
 
 node_modules/
 dist/

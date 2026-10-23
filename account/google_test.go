@@ -184,7 +184,7 @@ func TestGoogleLogin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, _ := s.accessToken(a)
+	tok, _, _ := s.accessToken(a)
 	if c, m := googleFlow(t, api.URL, tok, nil); c != 409 || m["code"] != "google_in_use" {
 		t.Fatalf("Google đã dùng cho tài khoản khác phải báo google_in_use: %d %v", c, m)
 	}

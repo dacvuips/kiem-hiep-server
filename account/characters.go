@@ -304,6 +304,9 @@ func (s *server) handleSaveCharacter(w http.ResponseWriter, r *http.Request) err
 	if err != nil {
 		return err
 	}
+	if s.redis != nil {
+		_ = s.redis.Set(ctx, fmt.Sprintf("game:char:%d", id), string(guarded), 30*time.Minute)
+	}
 	return writeJSON(w, http.StatusOK, map[string]any{"version": newVersion, "updated_at": updated})
 }
 

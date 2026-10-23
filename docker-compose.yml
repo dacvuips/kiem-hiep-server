@@ -41,6 +41,16 @@ services:
     image: axllent/mailpit:v1.20
     ports: ["127.0.0.1:8025:8025"]
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports: ["127.0.0.1:6379:6379"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+
   account:
     build:
       context: .
@@ -48,6 +58,7 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgres://kiemhiep:${DB_PASSWORD}@postgres:5432/kiemhiep?sslmode=disable
+      REDIS_URL: redis://redis:6379
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       CLIENT_DIR: /client          # bản cài game cho APK launcher (repo game: python tools/build_client_update.py)
@@ -58,6 +69,7 @@ services:
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
       mailpit: { condition: service_started }
 
   # GAME SERVER (Godot headless) — 4 tiến trình cùng 1 gói server/game/game_server.pck, khác nhau ở biến môi trường (khối chung x-game).
@@ -106,3 +118,4 @@ services:
 
 volumes:
   pgdata:
+  redisdata:

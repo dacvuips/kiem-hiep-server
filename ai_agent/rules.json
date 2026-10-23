@@ -1,0 +1,47 @@
+{
+  "allowed_read_paths": [
+    "D:\\game\\lam-game\\kiem-hiep-server",
+    "D:\\game\\lam-game\\kiem-hiep",
+    "D:\\game",
+    "E:\\game"
+  ],
+  "allowed_write_paths": [
+    "D:\\game\\lam-game\\kiem-hiep-server\\portal-web",
+    "D:\\game\\lam-game\\kiem-hiep-server\\admin-web",
+    "D:\\game\\lam-game\\kiem-hiep-server\\account",
+    "D:\\game\\lam-game\\kiem-hiep",
+    "D:\\game\\lam-game\\kiem-hiep-server"
+  ],
+  "forbidden_paths": [
+    ".env",
+    ".env.production",
+    ".git",
+    "deploy\\secrets",
+    "github_actions_deploy",
+    "id_rsa",
+    "id_ed25519"
+  ],
+  "forbidden_commands": [
+    "drop database",
+    "drop table",
+    "truncate",
+    "format ",
+    "rmdir /s /q c:",
+    "git reset --hard",
+    "git push -f",
+    "git push --force"
+  ],
+  "allowed_commands": [
+    "go build",
+    "go vet",
+    "go test",
+    "npm run build",
+    "npm run lint",
+    "git status",
+    "git diff",
+    "git add",
+    "git commit",
+    "git log",
+    "adb"
+  ]
+}

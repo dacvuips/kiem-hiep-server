@@ -12,6 +12,7 @@ import (
 type Config struct {
 	HTTPAddr    string
 	DatabaseURL string
+	RedisURL    string
 	JWTIssuer   string
 	JWTAudience string
 	// Tên miền web được gọi API từ trình duyệt (client web, web Admin), cách nhau dấu phẩy. Rỗng = không cho trình duyệt nào.
@@ -70,6 +71,7 @@ func loadConfig() Config {
 	c := Config{
 		HTTPAddr:           env("HTTP_ADDR", ":8080"),
 		DatabaseURL:        env("DATABASE_URL", ""),
+		RedisURL:           env("REDIS_URL", ""),
 		JWTIssuer:          env("JWT_ISSUER", "kiemhiep-account"),
 		JWTAudience:        env("JWT_AUDIENCE", "kiemhiep-game"),
 		CORSOrigins:        splitList(env("CORS_ORIGINS", "")),

@@ -43,11 +43,32 @@ func main() {
 		log.Fatalf("tạo admin đầu tiên: %v", err)
 	}
 
+	var rdb *redisClient
+	if cfg.RedisURL != "" {
+		rc, err := newRedisClient(cfg.RedisURL)
+		if err != nil {
+			log.Printf("kết nối Redis (%s): %v — dùng in-memory fallback", cfg.RedisURL, err)
+		} else {
+			rdb = rc
+			log.Printf("kết nối Redis: OK (%s)", cfg.RedisURL)
+		}
+	} else {
+		rc, err := newRedisClient("127.0.0.1:6379")
+		if err == nil {
+			rdb = rc
+			log.Printf("kết nối Redis: OK (127.0.0.1:6379)")
+		}
+	}
+	if rdb != nil {
+		defer rdb.Close()
+	}
+
 	s := &server{
-		cfg:  cfg,
-		keys: keys,
-		db:   db,
-		mail: newMailer(cfg),
+		cfg:   cfg,
+		keys:  keys,
+		db:    db,
+		redis: rdb,
+		mail:  newMailer(cfg),
 		// Theo IP nới rộng vì nhiều người chơi 4G/quán net chung 1 IP; chống dò mật khẩu nằm ở userRL.
 		// RATE_LIMIT_IP_PER_MIN: chỉ tăng khi chạy load test trên máy dev (tạo hàng trăm tài khoản bot từ 1 IP).
 		ipRL:   newRateLimiter(envInt("RATE_LIMIT_IP_PER_MIN", 120), max(60, envInt("RATE_LIMIT_IP_PER_MIN", 120)/2)),
@@ -72,6 +93,7 @@ func main() {
 	mux.HandleFunc("POST /v1/auth/logout", wrap(s.handleLogout))
 	mux.HandleFunc("POST /v1/auth/forgot", wrap(s.handleForgot))
 	mux.HandleFunc("POST /v1/auth/reset", wrap(s.handleReset))
+	mux.HandleFunc("GET /v1/auth/session", wrap(s.handleCheckSession))
 	mux.HandleFunc("POST /v1/account/password", wrap(s.handleChangePassword))
 	mux.HandleFunc("GET /v1/account/me", wrap(s.handleMe))
 	mux.HandleFunc("POST /v1/auth/google/start", wrap(s.handleGoogleStart))

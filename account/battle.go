@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
@@ -9,7 +11,7 @@ import (
 
 // Chiến trường Tống Kim: tiến trình game server riêng (GAME_BATTLE=1) đẩy trạng thái trận lên đây vài giây 1 lần
 // (POST /internal/game/battle); game đọc qua GET /v1/battle để hiện số người mỗi phe / giai đoạn / địa chỉ vào trận
-// TRƯỚC khi kết nối. Trạng thái chỉ giữ trong bộ nhớ — mất thì battle server gửi lại ngay lần sau.
+// TRƯỚC khi kết nối. Trạng thái giữ trong Redis có TTL (hoặc memory fallback).
 const battleStaleAfter = 15 * time.Second
 
 type battleState struct {
@@ -54,6 +56,14 @@ func (s *server) handleInternalBattle(w http.ResponseWriter, r *http.Request) er
 	battleStates.Lock()
 	battleStates.m[st.ServerID] = st
 	battleStates.Unlock()
+
+	// Lưu vào Redis cache (TTL 20s)
+	if s.redis != nil {
+		if raw, err := json.Marshal(st); err == nil {
+			_ = s.redis.Set(r.Context(), fmt.Sprintf("game:battle:%d", st.ServerID), string(raw), 20*time.Second)
+		}
+	}
+
 	return writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -66,12 +76,34 @@ func (s *server) handleBattle(w http.ResponseWriter, r *http.Request) error {
 	if err != nil || serverID <= 0 {
 		return errBadRequest
 	}
-	battleStates.Lock()
-	st, ok := battleStates.m[serverID]
-	battleStates.Unlock()
-	if !ok || time.Since(st.received) > battleStaleAfter {
+
+	var st battleState
+	var found bool
+
+	// Thử lấy từ Redis trước
+	if s.redis != nil {
+		if val, err := s.redis.Get(r.Context(), fmt.Sprintf("game:battle:%d", serverID)); err == nil && val != "" {
+			if err := json.Unmarshal([]byte(val), &st); err == nil {
+				found = true
+			}
+		}
+	}
+
+	// Fallback sang in-memory
+	if !found {
+		battleStates.Lock()
+		cached, ok := battleStates.m[serverID]
+		battleStates.Unlock()
+		if ok && time.Since(cached.received) <= battleStaleAfter {
+			st = cached
+			found = true
+		}
+	}
+
+	if !found {
 		return writeJSON(w, http.StatusOK, battleState{ServerID: serverID, Open: false})
 	}
+
 	// Trừ phần thời gian đã trôi kể từ lần báo gần nhất để đếm ngược ở game không bị "đứng" giữa 2 lần báo.
 	st.PhaseLeft = max(0, st.PhaseLeft-int(time.Since(st.received).Seconds()))
 	st.Open = true

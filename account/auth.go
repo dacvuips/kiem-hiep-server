@@ -31,15 +31,17 @@ var (
 	errBadEmail      = newErr(http.StatusBadRequest, "bad_email", "Email không hợp lệ")
 	errBadPassword   = newErr(http.StatusBadRequest, "bad_password", "Mật khẩu dài 6–64 ký tự")
 	errUsernameTaken = newErr(http.StatusConflict, "username_taken", "Tên tài khoản đã có người dùng")
-	errWrongLogin    = newErr(http.StatusUnauthorized, "wrong_login", "Sai tên tài khoản hoặc mật khẩu")
-	errWrongPassword = newErr(http.StatusUnauthorized, "wrong_password", "Mật khẩu hiện tại không đúng")
-	errBadCode       = newErr(http.StatusBadRequest, "bad_code", "Mã xác nhận không đúng hoặc đã hết hạn")
+	errWrongLogin       = newErr(http.StatusUnauthorized, "wrong_login", "Sai tên tài khoản hoặc mật khẩu")
+	errWrongPassword    = newErr(http.StatusUnauthorized, "wrong_password", "Mật khẩu hiện tại không đúng")
+	errBadCode          = newErr(http.StatusBadRequest, "bad_code", "Mã xác nhận không đúng hoặc đã hết hạn")
+	errLoggedElsewhere  = newErr(http.StatusUnauthorized, "logged_in_elsewhere", "Tài khoản vừa đăng nhập ở thiết bị khác")
 )
 
 type server struct {
 	cfg        Config
 	keys       *keyring
 	db         *pgxpool.Pool
+	redis      *redisClient
 	mail       *mailer
 	ipRL       *rateLimiter // mọi API tài khoản, theo IP
 	http       *http.Client
@@ -75,6 +77,7 @@ type accountRow struct {
 	// Token cấp trước mốc này bị từ chối (đổi/đặt lại mật khẩu = đá mọi phiên đang mở, kể cả access token còn hạn).
 	PasswordChangedAt time.Time
 	IsGM         bool
+	LastLoginAt  *time.Time
 }
 
 func (s *server) isGM(a accountRow) bool {
@@ -106,11 +109,11 @@ func (s *server) accountView(a accountRow) accountView {
 	}
 }
 
-const accountCols = `id, username, email, password_hash, google_sub, status, banned_until, ban_reason, password_changed_at, is_gm`
+const accountCols = `id, username, email, password_hash, google_sub, status, banned_until, ban_reason, password_changed_at, is_gm, last_login_at`
 
 func scanAccount(row pgx.Row) (accountRow, error) {
 	var a accountRow
-	err := row.Scan(&a.ID, &a.Username, &a.Email, &a.PasswordHash, &a.GoogleSub, &a.Status, &a.BannedUntil, &a.BanReason, &a.PasswordChangedAt, &a.IsGM)
+	err := row.Scan(&a.ID, &a.Username, &a.Email, &a.PasswordHash, &a.GoogleSub, &a.Status, &a.BannedUntil, &a.BanReason, &a.PasswordChangedAt, &a.IsGM, &a.LastLoginAt)
 	return a, err
 }
 
@@ -160,31 +163,33 @@ func checkNewPassword(p, username string) error {
 // ---------------------------------------------------------------- token
 
 // accessToken ký JWT bằng Ed25519 (EdDSA). Header mang "kid" để đổi khóa mà không làm hỏng token đang dùng.
-func (s *server) accessToken(a accountRow) (string, error) {
+func (s *server) accessToken(a accountRow) (string, string, error) {
 	now := time.Now()
 	jti, err := randomToken()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
+	jtiStr := jti[:16]
 	claims := jwt.MapClaims{
 		"iss":  s.cfg.JWTIssuer,
 		"aud":  s.cfg.JWTAudience,
 		"sub":  strconv.FormatInt(a.ID, 10),
 		"name": a.Username,
 		"typ":  "access",
-		"jti":  jti[:16],
+		"jti":  jtiStr,
 		"iat":  now.Unix(),
 		"nbf":  now.Unix(),
 		"exp":  now.Add(s.cfg.AccessTTL).Unix(),
 	}
 	t := jwt.NewWithClaims(jwt.SigningMethodEdDSA, claims)
 	t.Header["kid"] = s.keys.signKID
-	return t.SignedString(s.keys.signKey)
+	tok, err := t.SignedString(s.keys.signKey)
+	return tok, jtiStr, err
 }
 
 // parseAccess kiểm tra access token (chữ ký theo kid, thuật toán, iss, aud, hạn), trả về id tài khoản.
 // Game server làm đúng các bước này với khóa công khai lấy từ /.well-known/jwks.json.
-func (s *server) parseAccess(tok string) (id int64, issuedAt time.Time, err error) {
+func (s *server) parseAccess(tok string) (id int64, issuedAt time.Time, jti string, err error) {
 	t, err := jwt.Parse(tok, func(t *jwt.Token) (any, error) {
 		kid, _ := t.Header["kid"].(string)
 		if pub, ok := s.keys.verify[kid]; ok {
@@ -199,26 +204,30 @@ func (s *server) parseAccess(tok string) (id int64, issuedAt time.Time, err erro
 		jwt.WithIssuedAt(),
 		jwt.WithLeeway(30*time.Second))
 	if err != nil {
-		return 0, time.Time{}, errUnauthorized
+		return 0, time.Time{}, "", errUnauthorized
 	}
 	claims, _ := t.Claims.(jwt.MapClaims)
 	if claims["typ"] != "access" {
-		return 0, time.Time{}, errUnauthorized
+		return 0, time.Time{}, "", errUnauthorized
 	}
 	sub, _ := claims["sub"].(string)
 	id, err = strconv.ParseInt(sub, 10, 64)
 	if err != nil {
-		return 0, time.Time{}, errUnauthorized
+		return 0, time.Time{}, "", errUnauthorized
 	}
 	iat, err := claims.GetIssuedAt()
 	if err != nil || iat == nil {
-		return 0, time.Time{}, errUnauthorized
+		return 0, time.Time{}, "", errUnauthorized
 	}
-	return id, iat.Time, nil
+	jti, _ = claims["jti"].(string)
+	return id, iat.Time, jti, nil
 }
 
 // issue tạo phiên mới: refresh token (lưu hash trong DB) + access token.
 func (s *server) issue(ctx context.Context, a accountRow, r *http.Request) (sessionResp, error) {
+	// Thu hồi tất cả phiên cũ của tài khoản này để 1 tài khoản chỉ mở được 1 phiên
+	_, _ = s.db.Exec(ctx, `UPDATE sessions SET revoked_at=now() WHERE account_id=$1 AND revoked_at IS NULL`, a.ID)
+
 	refresh, err := randomToken()
 	if err != nil {
 		return sessionResp{}, err
@@ -228,10 +237,19 @@ func (s *server) issue(ctx context.Context, a accountRow, r *http.Request) (sess
 	if err != nil {
 		return sessionResp{}, err
 	}
-	access, err := s.accessToken(a)
+	access, jti, err := s.accessToken(a)
 	if err != nil {
 		return sessionResp{}, err
 	}
+
+	// Đánh dấu session jti mới nhất vào Redis
+	if s.redis != nil && jti != "" {
+		_ = s.redis.Set(ctx, fmt.Sprintf("auth:active_jti:%d", a.ID), jti, s.cfg.AccessTTL)
+	}
+
+	// Cập nhật last_login_at
+	_, _ = s.db.Exec(ctx, `UPDATE accounts SET last_login_at=now() WHERE id=$1`, a.ID)
+
 	return sessionResp{AccessToken: access, RefreshToken: refresh, ExpiresIn: int(s.cfg.AccessTTL.Seconds()), Account: s.accountView(a)}, nil
 }
 
@@ -252,10 +270,20 @@ func (s *server) requireAccount(r *http.Request) (accountRow, error) {
 	if !strings.HasPrefix(h, "Bearer ") {
 		return accountRow{}, errUnauthorized
 	}
-	id, issuedAt, err := s.parseAccess(strings.TrimPrefix(h, "Bearer "))
+	id, issuedAt, jti, err := s.parseAccess(strings.TrimPrefix(h, "Bearer "))
 	if err != nil {
 		return accountRow{}, err
 	}
+
+	// 1. Kiểm tra session qua Redis nếu có
+	if s.redis != nil && jti != "" {
+		if activeJTI, err := s.redis.Get(r.Context(), fmt.Sprintf("auth:active_jti:%d", id)); err == nil && activeJTI != "" {
+			if activeJTI != jti {
+				return accountRow{}, errLoggedElsewhere
+			}
+		}
+	}
+
 	a, err := s.accountByID(r.Context(), id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return accountRow{}, errUnauthorized
@@ -267,7 +295,26 @@ func (s *server) requireAccount(r *http.Request) (accountRow, error) {
 	if issuedAt.Before(a.PasswordChangedAt.Truncate(time.Second)) {
 		return accountRow{}, errUnauthorized
 	}
+
+	// 2. Kiểm tra nếu có phiên đăng nhập mới hơn trên DB (fallback khi Redis chưa có hoặc đã hết hạn)
+	if a.LastLoginAt != nil && a.LastLoginAt.After(issuedAt.Add(2*time.Second)) {
+		return accountRow{}, errLoggedElsewhere
+	}
+
 	return a, s.banError(r.Context(), a)
+}
+
+// handleCheckSession kiểm tra xem phiên của token hiện tại còn hiệu lực không (chưa bị đá)
+func (s *server) handleCheckSession(w http.ResponseWriter, r *http.Request) error {
+	a, err := s.requireAccount(r)
+	if err != nil {
+		return err
+	}
+	return writeJSON(w, http.StatusOK, map[string]any{
+		"ok":         true,
+		"account_id": a.ID,
+		"username":   a.Username,
+	})
 }
 
 func (s *server) limitIP(r *http.Request) error {

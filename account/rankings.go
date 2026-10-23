@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
@@ -9,7 +11,7 @@ import (
 
 // Bảng xếp hạng của 1 máy chủ: cao thủ (cấp cao nhất) và phú hộ (nhiều tiền nhất) toàn máy chủ + trong từng môn phái.
 // Tiền = tiền mang theo (gold) + tiền trong rương (storage_gold) của PlayerProfile. Cùng cấp thì ai nhiều kinh nghiệm hơn đứng trên.
-// Kết quả giữ trong bộ nhớ rankingTTL cho mỗi máy chủ — người chơi mở bảng liên tục không quét bảng characters mỗi lần.
+// Kết quả giữ trong Redis / bộ nhớ rankingTTL cho mỗi máy chủ — người chơi mở bảng liên tục không quét bảng characters mỗi lần.
 const (
 	rankingTTL       = 60 * time.Second
 	rankingTopServer = 100 // số người mỗi bảng toàn máy chủ
@@ -78,18 +80,45 @@ func (s *server) handleRankings(w http.ResponseWriter, r *http.Request) error {
 	if err != nil || serverID <= 0 {
 		return errBadRequest
 	}
+
+	ctx := r.Context()
+	rKey := fmt.Sprintf("game:ranking:%d", serverID)
+
+	// 1. Thử đọc từ Redis
+	if s.redis != nil {
+		if val, err := s.redis.Get(ctx, rKey); err == nil && val != "" {
+			var b rankingBoard
+			if err := json.Unmarshal([]byte(val), &b); err == nil {
+				return writeJSON(w, http.StatusOK, &b)
+			}
+		}
+	}
+
+	// 2. Thử đọc từ Memory Cache
 	rankingCache.Lock()
 	defer rankingCache.Unlock() // 1 truy vấn / máy chủ / TTL, người hỏi cùng lúc chờ chung kết quả
 	if b := rankingCache.boards[serverID]; b != nil && time.Since(b.UpdatedAt) < rankingTTL {
 		return writeJSON(w, http.StatusOK, b)
 	}
-	rows, err := s.db.Query(r.Context(), rankingQuery, serverID, rankingTopServer, rankingTopSect)
+
+	// 3. Quét PostgreSQL khi cache hết hạn
+	rows, err := s.db.Query(ctx, rankingQuery, serverID, rankingTopServer, rankingTopSect)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
-	b := &rankingBoard{ServerID: serverID, UpdatedAt: time.Now(), Level: []rankingEntry{}, Money: []rankingEntry{},
-		PK: []rankingEntry{}, SectLevel: map[string][]rankingEntry{}, SectMoney: map[string][]rankingEntry{}, TTLSeconds: int(rankingTTL.Seconds())}
+
+	b := &rankingBoard{
+		ServerID:   serverID,
+		UpdatedAt:  time.Now(),
+		Level:      []rankingEntry{},
+		Money:      []rankingEntry{},
+		PK:         []rankingEntry{},
+		SectLevel:  map[string][]rankingEntry{},
+		SectMoney:  map[string][]rankingEntry{},
+		TTLSeconds: int(rankingTTL.Seconds()),
+	}
+
 	for rows.Next() {
 		var board, sect string
 		var e rankingEntry
@@ -115,6 +144,15 @@ func (s *server) handleRankings(w http.ResponseWriter, r *http.Request) error {
 	if err := rows.Err(); err != nil {
 		return err
 	}
+
 	rankingCache.boards[serverID] = b
+
+	// Lưu kết quả vào Redis
+	if s.redis != nil {
+		if raw, err := json.Marshal(b); err == nil {
+			_ = s.redis.Set(ctx, rKey, string(raw), rankingTTL)
+		}
+	}
+
 	return writeJSON(w, http.StatusOK, b)
 }
