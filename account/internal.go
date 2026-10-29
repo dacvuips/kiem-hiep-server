@@ -59,8 +59,10 @@ func (s *server) handleInternalJoin(w http.ResponseWriter, r *http.Request) erro
 	}
 	var muted *time.Time
 	s.db.QueryRow(r.Context(), `SELECT muted_until FROM accounts WHERE id=$1`, a.ID).Scan(&muted)
+	var walletXu int64
+	s.db.QueryRow(r.Context(), `SELECT xu FROM wallets WHERE account_id=$1`, a.ID).Scan(&walletXu)
 	return writeJSON(w, http.StatusOK, map[string]any{
-		"account":   map[string]any{"id": a.ID, "username": a.Username, "muted_until": muted, "is_gm": s.isGM(a)},
+		"account":   map[string]any{"id": a.ID, "username": a.Username, "muted_until": muted, "is_gm": s.isGM(a), "xu": walletXu},
 		"character": c,
 	})
 }
@@ -188,24 +190,24 @@ func (s *server) handleInternalStatus(w http.ResponseWriter, r *http.Request) er
 	return writeJSON(w, http.StatusOK, map[string]any{"statuses": out, "grants": grants, "reload": reload})
 }
 
-// Quà chờ của các nhân vật đang online: {character_id: [{id, jade}]}. Game server cộng vào nhân vật rồi gửi grant_ids khi lưu.
+// Quà chờ của các nhân vật đang online: {character_id: [{id, jade, xu}]}. Game server cộng vào nhân vật rồi gửi grant_ids khi lưu.
 func (s *server) pendingGrants(ctx context.Context, characterIDs []int64) (map[string][]map[string]int64, error) {
 	out := map[string][]map[string]int64{}
 	if len(characterIDs) == 0 {
 		return out, nil
 	}
-	rows, err := s.db.Query(ctx, `SELECT id, character_id, jade FROM character_grants WHERE character_id = ANY($1) AND status='pending' ORDER BY id`, characterIDs)
+	rows, err := s.db.Query(ctx, `SELECT id, character_id, jade, xu FROM character_grants WHERE character_id = ANY($1) AND status='pending' ORDER BY id`, characterIDs)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var id, cid, jade int64
-		if err := rows.Scan(&id, &cid, &jade); err != nil {
+		var id, cid, jade, xu int64
+		if err := rows.Scan(&id, &cid, &jade, &xu); err != nil {
 			return nil, err
 		}
 		k := strconv.FormatInt(cid, 10)
-		out[k] = append(out[k], map[string]int64{"id": id, "jade": jade})
+		out[k] = append(out[k], map[string]int64{"id": id, "jade": jade, "xu": xu})
 	}
 	return out, nil
 }

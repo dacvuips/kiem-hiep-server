@@ -7,7 +7,71 @@
 		# Proxy phía trước nằm trong mạng riêng: tin X-Forwarded-For để account thấy IP thật của người chơi.
 		trusted_proxies static private_ranges
 	}
+	auto_https disable_redirects
 }
+
+# Tên miền riêng cho bản Game Web: play.viettheo.site
+http://play.viettheo.site, play.viettheo.site:80 {
+	header {
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Embedder-Policy "require-corp"
+	}
+
+	# Xử lý CORS Preflight cho các API gọi từ trình duyệt
+	@cors_options {
+		path /v1/*
+		method OPTIONS
+	}
+	handle @cors_options {
+		header Access-Control-Allow-Origin "{header.Origin}"
+		header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+		header Access-Control-Allow-Headers "Authorization, Content-Type, Accept"
+		header Access-Control-Max-Age "86400"
+		respond "" 204
+	}
+
+	# Chuyển tiếp API tài khoản để đăng nhập, tạo nhân vật (gắn header CORS)
+	handle /v1/* {
+		reverse_proxy account:8080 {
+			header_down Access-Control-Allow-Origin "{header.Origin}"
+			header_down Access-Control-Allow-Headers "Authorization, Content-Type, Accept"
+			header_down Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+		}
+	}
+
+	# WebSocket kết nối thẳng game server
+	handle /ws/world {
+		reverse_proxy game:7778
+	}
+	handle /ws/battle {
+		reverse_proxy battle:7788
+	}
+	handle /ws/arena {
+		reverse_proxy arena:7798
+	}
+	handle /ws/field/0 {
+		reverse_proxy field:7808
+	}
+
+	# Phục vụ toàn bộ tài nguyên tĩnh web game (index.html, wasm, pck)
+	handle {
+		root * /var/www/web
+		@compress not path *.pck
+		encode @compress zstd gzip
+
+		# Không cache index.html để khi cập nhật game người chơi luôn nhận file mới
+		@html path /index.html /
+		header @html Cache-Control "no-cache, no-store, must-revalidate"
+
+		# Cache cực mạnh (1 năm) cho các file tài nguyên nặng (pck, wasm, ảnh, âm thanh)
+		# Giúp người chơi F5/reload không phải tải lại 1.2GB từ đầu mà đọc ngay từ ổ cứng
+		@assets path *.pck *.wasm *.png *.jpg *.jpeg *.ico *.svg *.js *.worklet.js
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+
+		file_server
+	}
+}
+
 {$SITE_ADDR} {
 	handle /ws/world {
 		reverse_proxy game:7778
@@ -28,6 +92,28 @@
 	}
 	handle /tai-game* {
 		redir /download/ 302
+	}
+
+	# Bản Game Web (HTML5 / WebAssembly đa luồng)
+	handle_path /web* {
+		root * /var/www/web
+		header {
+			Cross-Origin-Opener-Policy "same-origin"
+			Cross-Origin-Embedder-Policy "require-corp"
+		}
+		@compress not path *.pck
+		encode @compress zstd gzip
+
+		@html path /index.html /
+		header @html Cache-Control "no-cache, no-store, must-revalidate"
+
+		@assets path *.pck *.wasm *.png *.jpg *.jpeg *.ico *.svg *.js *.worklet.js
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+
+		file_server
+	}
+	handle /play* {
+		redir /web/ 302
 	}
 
 	# Mọi đường khác -> server tài khoản.

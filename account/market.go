@@ -50,6 +50,13 @@ func (s *server) handleInternalSaveMarket(w http.ResponseWriter, r *http.Request
 	if req.ID == "" || len(req.ID) > 64 || len(req.Data) == 0 {
 		return errBadRequest
 	}
+	// KHÓA BẢO MẬT TỪ BE: Chỉ lưu những món của nhân vật thật (sid > 0), cấm tuyệt đối bot/chợ giả (sid <= 0).
+	var itemMeta struct {
+		SID int `json:"sid"`
+	}
+	if err := json.Unmarshal(req.Data, &itemMeta); err != nil || itemMeta.SID <= 0 {
+		return errBadRequest
+	}
 	if _, err := s.db.Exec(r.Context(), `INSERT INTO market_listings(server_id, id, data) VALUES ($1,$2,$3)
 		ON CONFLICT (server_id, id) DO UPDATE SET data=EXCLUDED.data, updated_at=now()`, req.ServerID, req.ID, req.Data); err != nil {
 		return err

@@ -45,6 +45,7 @@ push_deploy_files() {
 
 swarm_up() {
 	push_deploy_files
+	ssh_ "grep -q 'play.viettheo.site' '$R/stack.env' 2>/dev/null || sed -i 's/CORS_ORIGINS=.*/&,https:\/\/play.viettheo.site/' '$R/stack.env' 2>/dev/null || true"
 	ssh_ "cd '$R' && bash deploy/swarm_up.sh '$HUB' $*"
 	echo "== Kiểm tra https://$DOMAIN/healthz"
 	curl -fsS -m 15 "https://$DOMAIN/healthz" && echo " <- ok" \
@@ -105,9 +106,32 @@ push_client() {
 	# Manifest đi SAU CÙNG: người chơi chỉ thấy bản mới khi mọi gói đã nằm trên server.
 	scp_ "$dir/manifest.json" "$VPS:$R/client/manifest.json.tmp"
 	ssh_ "mv '$R/client/manifest.json.tmp' '$R/client/manifest.json'"
-	keep="$(cd "$dir/files" && ls *.pck 2>/dev/null | tr '\n' ' ')"
+	# Chỉ xóa file pck rác cũ không còn nằm trong manifest.json
+	keep="$(grep -oE '"file": "[^"]+"' "$dir/manifest.json" | cut -d'"' -f4 | tr '\n' ' ')"
 	ssh_ "cd '$R/client/files' && for f in *.pck; do case \" $keep \" in *\" \$f \"*) ;; *) rm -f \"\$f\";; esac; done; rm -f *.tmp"
 	echo "   đã lên — người chơi nhận ở lần mở app tiếp theo"
+}
+
+deploy_web() {
+	echo "== Đẩy bản Web (build/web) lên VPS..."
+	local web_dir="$GAME_REPO/build/web"
+	if [ ! -f "$web_dir/index.html" ]; then
+		if [ -f "$repo/../kiem-hiep/build/web/index.html" ]; then
+			web_dir="$repo/../kiem-hiep/build/web"
+		elif [ -f "./build/web/index.html" ]; then
+			web_dir="./build/web"
+		else
+			die "Chưa có $web_dir/index.html — hãy chạy build_web.bat trước"
+		fi
+	fi
+	ssh_ "mkdir -p '$R/web'"
+	echo "   Nén và tải các file web lên $VPS:$R/web (khoảng 1.2GB, vui lòng đợi vài phút)..."
+	(cd "$web_dir" && tar -czf - .) | ssh_ "tar -xzf - -C '$R/web'"
+	echo "   Cập nhật Caddyfile và reload Swarm stack..."
+	swarm_up
+	echo "==> HOÀN TẤT! Bản Web đã sẵn sàng."
+	echo "    Địa chỉ truy cập chính: https://play.viettheo.site"
+	echo "    Địa chỉ phụ: https://$DOMAIN/web/"
 }
 
 cmd="${1:-}"
@@ -123,6 +147,14 @@ case "$cmd" in
 	game) deploy_game ;;
 	redeploy) shift; [ $# -ge 1 ] || die "cần account=<TAG> và/hoặc game=<TAG>"; swarm_up "$@" ;;
 	client) push_client ;;
+	web) deploy_web ;;
+	config)
+		if [ -f "$repo/../kiem-hiep/build/web/index.html" ]; then
+			echo "== Cập nhật file index.html lên VPS..."
+			scp_ "$repo/../kiem-hiep/build/web/index.html" "$VPS:$R/web/index.html"
+		fi
+		swarm_up
+		;;
 	status) ssh_ "docker stack services kiemhiep; docker stack ps kiemhiep --filter desired-state=running --format 'table {{.Name}}\t{{.Node}}\t{{.CurrentState}}\t{{.Error}}'" ;;
 	logs) ssh_ "docker service logs --tail 200 -f kiemhiep_${2:-account}" ;;
 	*) sed -n '2,15p' "$0"; exit 1 ;;

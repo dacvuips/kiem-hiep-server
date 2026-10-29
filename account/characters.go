@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -22,6 +23,7 @@ import (
 // Khi game server (bước B) chạy, chỉ game server được ghi data; API PUT này sẽ chỉ còn cho phần cài đặt giao diện.
 const (
 	maxCharacters    = 4
+	maxLevel         = 200
 	minNameRunes     = 2
 	maxNameRunes     = 16
 	maxCharacterData = 256 << 10
@@ -93,7 +95,11 @@ func profileSummary(raw json.RawMessage, name string) (data []byte, gender int, 
 		return 0
 	}
 	gender = num("gender")
-	level = max(1, num("level"))
+	level = min(maxLevel, max(1, num("level")))
+	m["level"] = level
+	if level >= maxLevel {
+		m["exp"] = 0
+	}
 	sect, _ = m["sect_id"].(string)
 	data, err = json.Marshal(m)
 	return data, gender, sect, level, err

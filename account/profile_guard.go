@@ -32,14 +32,22 @@ func guardClientSave(oldRaw json.RawMessage, incoming map[string]any) map[string
 		}
 	}
 	if lv := num(incoming["level"]); lv > 0 {
-		incoming["level"] = lv
+		incoming["level"] = min(200, lv)
 	} else if v, ok := old["level"]; ok {
-		incoming["level"] = v
+		incoming["level"] = min(200, num(v))
 	}
 	if exp, ok := incoming["exp"]; ok {
-		incoming["exp"] = exp
+		if num(incoming["level"]) >= 200 {
+			incoming["exp"] = 0
+		} else {
+			incoming["exp"] = exp
+		}
 	} else if v, ok := old["exp"]; ok {
-		incoming["exp"] = v
+		if num(incoming["level"]) >= 200 {
+			incoming["exp"] = 0
+		} else {
+			incoming["exp"] = v
+		}
 	}
 	// Đã bỏ phe Tống / Kim cố định của nhân vật (phe chỉ chọn trong trận Chiến trường Tống Kim).
 	delete(incoming, "nation")
@@ -104,6 +112,9 @@ func guardClientSave(oldRaw json.RawMessage, incoming map[string]any) map[string
 	incoming["storage_extra"] = newExtra
 	if j := num(incoming["jade"]); j < 0 || j > num(old["jade"]) {
 		incoming["jade"] = old["jade"]
+	}
+	if x := num(incoming["xu"]); x < 0 || x > num(old["xu"]) {
+		incoming["xu"] = old["xu"]
 	}
 	// Điểm (giữ nguyên điểm đã cộng/nhận từ test)
 	stats := []string{"strength", "dexterity", "vitality", "energy", "potential_points"}
