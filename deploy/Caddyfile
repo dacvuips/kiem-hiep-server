@@ -63,9 +63,12 @@ http://play.viettheo.site, play.viettheo.site:80 {
 		@html path /index.html /
 		header @html Cache-Control "no-cache, no-store, must-revalidate"
 
-		# Cache cực mạnh (1 năm) cho các file tài nguyên nặng (pck, wasm, ảnh, âm thanh)
-		# Giúp người chơi F5/reload không phải tải lại 1.2GB từ đầu mà đọc ngay từ ổ cứng
-		@assets path *.pck *.wasm *.png *.jpg *.jpeg *.ico *.svg *.js *.worklet.js
+		# Script JS luôn kiểm tra phiên bản mới, không khóa cứng trong cache
+		@scripts path *.js *.worklet.js
+		header @scripts Cache-Control "public, max-age=3600, must-revalidate"
+
+		# Cache cực mạnh cho các file tài nguyên nặng (pck, wasm, ảnh, âm thanh)
+		@assets path *.pck *.wasm *.png *.jpg *.jpeg *.ico *.svg
 		header @assets Cache-Control "public, max-age=31536000, immutable"
 
 		file_server
@@ -107,7 +110,12 @@ http://play.viettheo.site, play.viettheo.site:80 {
 		@html path /index.html /
 		header @html Cache-Control "no-cache, no-store, must-revalidate"
 
-		@assets path *.pck *.wasm *.png *.jpg *.jpeg *.ico *.svg *.js *.worklet.js
+		# Script JS luôn kiểm tra phiên bản mới, không khóa cứng trong cache
+		@scripts path *.js *.worklet.js
+		header @scripts Cache-Control "public, max-age=3600, must-revalidate"
+
+		# Cache cực mạnh cho các file tài nguyên nặng (pck, wasm, ảnh, âm thanh)
+		@assets path *.pck *.wasm *.png *.jpg *.jpeg *.ico *.svg
 		header @assets Cache-Control "public, max-age=31536000, immutable"
 
 		file_server
