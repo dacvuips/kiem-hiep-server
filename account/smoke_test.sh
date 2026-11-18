@@ -36,7 +36,7 @@ r=$(post /v1/auth/login "{\"username\":\"${U^^}\",\"password\":\"matkhau1\"}")
 ACCESS=$(jq -r .access_token <<<"$r"); REFRESH2=$(jq -r .refresh_token <<<"$r")
 check "đăng nhập (không phân biệt hoa thường)" "$(jq -r .account.username <<<"$r")" "$U"
 check "xem tài khoản" "$(get /v1/account/me "$ACCESS" | jq -r .email)" "$EMAIL"
-check "danh sách máy chủ" "$(get /v1/servers "$ACCESS" | jq -r '.servers[0].name')" "Tống Kim 01"
+check "danh sách máy chủ" "$(get /v1/servers "$ACCESS" | jq -r '.servers[0].name')" "Tuyết Sơn"
 check "không có token" "$(get /v1/servers "" | jq -r .code)" "unauthorized"
 
 r=$(post /v1/auth/refresh "{\"refresh_token\":\"$REFRESH2\"}")

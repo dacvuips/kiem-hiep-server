@@ -91,6 +91,8 @@ http://play.viettheo.site, play.viettheo.site:80 {
 	# Trang tải game và file APK
 	handle_path /download* {
 		root * /var/www/download
+		@apk path *.apk
+		header @apk Cache-Control "no-cache, must-revalidate"
 		file_server
 	}
 	handle /tai-game* {

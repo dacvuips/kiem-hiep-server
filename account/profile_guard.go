@@ -51,6 +51,19 @@ func guardClientSave(oldRaw json.RawMessage, incoming map[string]any) map[string
 	}
 	// Đã bỏ phe Tống / Kim cố định của nhân vật (phe chỉ chọn trong trận Chiến trường Tống Kim).
 	delete(incoming, "nation")
+	// stage_stars: giữ lại và hợp nhất số sao đã đạt của các ải
+	if oldStars, ok := old["stage_stars"].(map[string]any); ok {
+		inStars, _ := incoming["stage_stars"].(map[string]any)
+		if inStars == nil {
+			inStars = map[string]any{}
+		}
+		for k, v := range oldStars {
+			if num(inStars[k]) < num(v) {
+				inStars[k] = v
+			}
+		}
+		incoming["stage_stars"] = inStars
+	}
 	// Hảo hữu + điểm PK + điểm tích lũy Tống Kim chỉ game server đổi: bản cũ chưa có thì game cũng không được tự thêm.
 	clientPoints := num(incoming["songjin_points"])   // điểm Tống Kim game gửi — chỉ nhận khi mua thuốc Tống Kim (bên dưới)
 	for _, k := range []string{"friends", "pk_value", "songjin_points"} {

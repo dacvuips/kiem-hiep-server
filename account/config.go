@@ -86,7 +86,7 @@ func loadConfig() Config {
 		BootstrapAdminUser: env("BOOTSTRAP_ADMIN_USER", ""),
 		BootstrapAdminPass: env("BOOTSTRAP_ADMIN_PASS", ""),
 		TrustProxy:         env("TRUST_PROXY", "false") == "true",
-		DevTrustClientSaves: env("DEV_TRUST_CLIENT_SAVES", "true") == "true",
+		DevTrustClientSaves: env("DEV_TRUST_CLIENT_SAVES", "false") == "true", // mặc định TẮT: thiếu biến = máy thật, mọi lần lưu qua guardClientSave
 		GMAccounts:          splitList(env("GM_ACCOUNTS", "")),
 		AdminCookieSecure:  env("ADMIN_COOKIE_SECURE", "true") != "false",
 		AdminWebDir:        env("ADMIN_WEB_DIR", ""),

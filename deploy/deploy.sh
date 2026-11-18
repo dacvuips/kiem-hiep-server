@@ -26,8 +26,8 @@ GAME_HOST="${GAME_HOST:-$DOMAIN}"   # game đi qua cổng 443 của DOMAIN (wss:
 [ -n "$VPS" ] && [ -n "$DOMAIN" ] && [ -n "$HUB" ] || die "deploy.env thiếu VPS / DOMAIN / HUB"
 case "$VPS" in *1.2.3.4*) die "deploy.env vẫn là giá trị mẫu";; esac
 
-ssh_() { ssh -p "$SSH_PORT" -o ServerAliveInterval=30 "$VPS" "$@"; }
-scp_() { scp -P "$SSH_PORT" "$@"; }
+ssh_() { ssh -p "$SSH_PORT" -o ServerAliveInterval=15 -o ServerAliveCountMax=6 "$VPS" "$@"; }
+scp_() { scp -P "$SSH_PORT" -o ServerAliveInterval=15 -o ServerAliveCountMax=6 "$@"; }
 
 platform() {
 	case "$(ssh_ uname -m | tr -d '\r')" in
