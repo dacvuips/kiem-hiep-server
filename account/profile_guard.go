@@ -66,6 +66,14 @@ func guardClientSave(oldRaw json.RawMessage, incoming map[string]any) map[string
 	}
 	// Hảo hữu + điểm PK + điểm tích lũy Tống Kim chỉ game server đổi: bản cũ chưa có thì game cũng không được tự thêm.
 	clientPoints := num(incoming["songjin_points"])   // điểm Tống Kim game gửi — chỉ nhận khi mua thuốc Tống Kim (bên dưới)
+	// Ủy thác (UyThac trong game): mốc giờ + quỹ giờ + báo cáo chỉ game server ghi — game sửa mốc lùi = EXP ủy thác ảo.
+	for _, k := range []string{"uy_thac_seen", "uy_thac_report", "uy_thac_bank"} {
+		if v, ok := old[k]; ok {
+			incoming[k] = v
+		} else {
+			delete(incoming, k)
+		}
+	}
 	for _, k := range []string{"friends", "pk_value", "songjin_points"} {
 		if v, ok := old[k]; ok {
 			incoming[k] = v
