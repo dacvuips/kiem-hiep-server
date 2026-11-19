@@ -27,6 +27,10 @@ type fieldRoom struct {
 	Host    string `json:"host"`  // tên chủ phòng
 	Members int    `json:"members"`
 	Max     int    `json:"max"`
+	// Phòng có mật khẩu (mật khẩu chỉ nằm ở field server, không bao giờ gửi lên đây).
+	Locked bool `json:"locked"`
+	// "" = phòng train Vượt Ải; "guild" = Tổng Đà Bang Hội; "boss" = Săn Boss — danh sách phòng ở game chỉ hiện "".
+	Kind string `json:"kind,omitempty"`
 	// Địa chỉ tiến trình field server giữ phòng (server tài khoản điền khi gộp).
 	Addr   string `json:"addr"`
 	Port   int    `json:"port"`
