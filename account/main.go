@@ -123,6 +123,7 @@ func main() {
 	mux.HandleFunc("GET /v1/battle", wrap(s.handleBattle))
 	mux.HandleFunc("GET /v1/arena", wrap(s.handleArena))
 	mux.HandleFunc("GET /v1/field", wrap(s.handleField))
+	mux.HandleFunc("POST /v1/field/check", wrap(s.handleFieldCheck))
 
 	// Nội bộ: game server
 	mux.HandleFunc("POST /internal/game/join", wrap(s.handleInternalJoin))

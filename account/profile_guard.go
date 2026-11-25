@@ -11,7 +11,7 @@ import (
 //   - cấp, kinh nghiệm, tên, môn phái, giới tính, cờ server_seen: giữ bản đã lưu;
 //   - tiền (lượng + tiền rương) không tăng; nguyên bảo không tăng;
 //   - đồ: chỉ món đã có (theo uid), chỉ số giữ bản đã lưu, chỉ nhận vị trí / khoá / giá; bỏ món lạ / trùng uid — trừ THUỐC mới mua ở
-//     Hiệu thuốc (mã trong potion_prices.json): nhận nếu tiền đã trừ đủ tổng giá (cùng bất biến tiền), không thì bỏ hết thuốc mới;
+//     Hiệu thuốc (mã trong potion_prices.json, chồng tối đa 50): nhận nếu tiền đã trừ đủ giá số bình tăng thêm (cùng bất biến tiền), không thì bỏ hết thuốc mới;
 //   - tổng (4 chỉ số + điểm tiềm năng) không tăng; tổng (cấp các skill + điểm kỹ năng) không tăng;
 //   - phe Tống / Kim: chỉ chọn được 1 lần khi chưa có phe và cấp đã lưu >= 50.
 //
@@ -91,27 +91,14 @@ func guardClientSave(oldRaw json.RawMessage, incoming map[string]any) map[string
 	for k := oldExtra; k < newExtra; k++ {
 		cost += 500000 * (k + 1)
 	}
-	// Thuốc mới mua ở Hiệu thuốc: cộng giá vào khoản đã tiêu (uid của bản đã lưu).
-	oldUids := map[string]map[string]any{}
-	for _, it := range asList(old["inventory"]) {
-		if m, ok := it.(map[string]any); ok {
-			if uid, _ := m["uid"].(string); uid != "" {
-				oldUids[uid] = m
-			}
-		}
-	}
-	for _, it := range asList(old["storage"]) {
-		if m, ok := it.(map[string]any); ok {
-			if uid, _ := m["uid"].(string); uid != "" {
-				oldUids[uid] = m
-			}
-		}
-	}
+	// Thuốc chồng được (tối đa potionStack bình 1 ô): tính theo TỔNG số bình mỗi mã (túi + rương) tăng thêm bao nhiêu,
+	// nên gộp chồng / sắp xếp không tốn tiền, mua thêm vào chồng cũ vẫn bị tính đủ.
 	pointsCost := 0.0
-	for _, it := range asList(incoming["inventory"]) {
-		if g, p, ok := newPotionPrice(it, oldUids); ok {
-			cost += g
-			pointsCost += p
+	oldPotions := potionTotals(old)
+	for mid, n := range potionTotals(incoming) {
+		if d := n - oldPotions[mid]; d > 0 {
+			cost += potionPrices.Gold[mid] * d
+			pointsCost += potionPrices.Points[mid] * d
 		}
 	}
 	acceptPotions := true
@@ -193,6 +180,14 @@ func guardClientSave(oldRaw json.RawMessage, incoming map[string]any) map[string
 			}
 		}
 		guardLock(base, out)
+		// Chồng thuốc: nhận số bình game gửi (dùng bớt / gộp / mua thêm); không nhận thuốc mới thì chỉ được giảm.
+		if isPotion(base["mid"]) {
+			n := potionCount(m)
+			if !acceptPotions && n > potionCount(base) {
+				n = potionCount(base)
+			}
+			out["count"] = n
+		}
 		return out
 	}
 	for _, key := range []string{"inventory", "storage"} {
@@ -200,7 +195,7 @@ func guardClientSave(oldRaw json.RawMessage, incoming map[string]any) map[string
 		for _, it := range asList(incoming[key]) {
 			if v := fix(it); v != nil {
 				list = append(list, v)
-			} else if key == "inventory" && acceptPotions {
+			} else if acceptPotions {
 				if _, _, ok := newPotionPrice(it, known); ok {
 					m := it.(map[string]any)
 					if uid, _ := m["uid"].(string); !seen[uid] {

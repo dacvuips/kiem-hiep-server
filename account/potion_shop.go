@@ -43,9 +43,37 @@ func newPotionPrice(it any, known map[string]map[string]any) (gold, points float
 	return g, p, true
 }
 
-// Bản chuẩn của 1 bình thuốc mới: chỉ mã + vị trí trong túi do game đặt, 1 bình (thuốc không chồng).
+// Số bình tối đa 1 chồng thuốc (= ItemDatabase.POTION_STACK của game).
+const potionStack = 50
+
+func isPotion(mid any) bool {
+	s, _ := mid.(string)
+	_, g := potionPrices.Gold[s]
+	_, p := potionPrices.Points[s]
+	return s != "" && (g || p)
+}
+
+// Số bình của 1 chồng thuốc, kẹp 1..potionStack.
+func potionCount(m map[string]any) float64 {
+	return min(max(num(m["count"]), 1), potionStack)
+}
+
+// Tổng số bình mỗi mã thuốc trong túi + rương của 1 bản nhân vật.
+func potionTotals(p map[string]any) map[string]float64 {
+	out := map[string]float64{}
+	for _, key := range []string{"inventory", "storage"} {
+		for _, it := range asList(p[key]) {
+			if m, ok := it.(map[string]any); ok && isPotion(m["mid"]) {
+				out[m["mid"].(string)] += potionCount(m)
+			}
+		}
+	}
+	return out
+}
+
+// Bản chuẩn của 1 chồng thuốc mới: chỉ mã + số bình + vị trí trong túi do game đặt.
 func cleanPotion(m map[string]any) map[string]any {
-	out := map[string]any{"dv": 2, "uid": m["uid"], "mid": m["mid"], "count": 1, "ilv": 0, "base": -1, "gold": -1}
+	out := map[string]any{"dv": 2, "uid": m["uid"], "mid": m["mid"], "count": potionCount(m), "ilv": 0, "base": -1, "gold": -1}
 	for _, k := range []string{"rx", "ry", "rb"} {
 		if v, ok := m[k]; ok {
 			out[k] = v

@@ -233,9 +233,17 @@ func (s *server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) e
 	if count >= maxCharacters {
 		return errTooMany
 	}
-	c, err := scanCharacter(tx.QueryRow(ctx, `INSERT INTO characters(account_id, server_id, slot, name, name_key, gender, sect_id, level, data)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING `+characterCols,
-		a.ID, req.ServerID, req.Slot, name, key, gender, sect, level, data))
+	// ID = 9 số ngẫu nhiên (DEFAULT gen_character_id(), migration 0014). Trùng ID (2 lệnh cùng lúc
+	// trúng 1 số) -> ON CONFLICT bỏ qua, không trả dòng -> thử lại với số khác.
+	var c characterView
+	for attempt := 0; ; attempt++ {
+		c, err = scanCharacter(tx.QueryRow(ctx, `INSERT INTO characters(account_id, server_id, slot, name, name_key, gender, sect_id, level, data)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (id) DO NOTHING RETURNING `+characterCols,
+			a.ID, req.ServerID, req.Slot, name, key, gender, sect, level, data))
+		if !errors.Is(err, pgx.ErrNoRows) || attempt >= 4 {
+			break
+		}
+	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		if pgErr.ConstraintName == "characters_slot_uniq" {

@@ -16,7 +16,7 @@ function Hero() {
       <div className="relative mx-auto w-full max-w-4xl px-4 py-20 text-center">
         <p className="animate-rise font-serif text-xs uppercase tracking-[0.5em] text-gold-300/90 sm:text-sm">Giang hồ hiểm ác — anh hùng xuất thiếu niên</p>
         <div className="mt-5 flex justify-center animate-rise [animation-delay:80ms]">
-          <img src="/img/logo.png" alt="Kiếm Hiệp — JX1 Idle Origin" className="h-28 w-auto max-w-[85%] object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,0.8)] sm:h-36 md:h-44" />
+          <img src="/img/logo.png?v=2" alt="Kiếm Hiệp — JX1 Idle Origin" className="h-28 w-auto max-w-[85%] object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,0.8)] sm:h-36 md:h-44" />
         </div>
         <div className="mx-auto mt-4 flex max-w-md animate-rise items-center gap-3 [animation-delay:140ms]">
           <span className="divider-gold" />

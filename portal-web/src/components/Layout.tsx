@@ -17,7 +17,7 @@ export function Logo({ compact }: { compact?: boolean }) {
   return (
     <Link to="/" className="group flex items-center gap-3" aria-label="Kiếm Hiệp — Trang chủ">
       <img
-        src="/img/logo.png"
+        src="/img/logo.png?v=2"
         alt="Kiếm Hiệp"
         className="h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-105 sm:h-12"
       />
